@@ -163,7 +163,7 @@ def save_data_for_amm(model_save_path):
 
 
 #file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/654.roms-s0.txt.xz"
-file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
+file_path="/data/pengmiao/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
 
 
 res_root = "../dataset/mlp_demo/410.bwaves/"
