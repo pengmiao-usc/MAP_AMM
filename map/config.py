@@ -63,9 +63,9 @@ early_stop=5
 gamma = 0.1
 step_size=20
 
-gpu_id = '0'
+gpu_id = '4'
 #device_id = [0, 1]
-device_id = [0]
+device_id = [4]
 
 # set device
 if gpu_id != '':

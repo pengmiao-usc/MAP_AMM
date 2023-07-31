@@ -1,5 +1,5 @@
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'#'2 in tarim'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '4'#'2 in tarim'
 import warnings
 warnings.filterwarnings('ignore')
 import sys
@@ -30,7 +30,7 @@ from torchinfo import summary
 
 torch.manual_seed(100)
 
-device=cf.device
+device=torch.device(f"cuda:4")
 batch_size=cf.batch_size
 epochs = cf.epochs
 lr = cf.lr
@@ -43,12 +43,24 @@ early_stop = cf.early_stop
 
 # update: tab
 
-from mlp_simple import MLP
+# from mlp_simple import MLP
 
-model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)*cf.channels),
-            hidden_size = cf.dim,
-            num_classes = cf.num_classes
-            )
+# model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)*cf.channels),
+#             hidden_size = cf.dim,
+#             num_classes = cf.num_classes
+#             )
+
+from m import MLPMixer
+
+model = MLPMixer(
+    image_size = cf.image_size,
+    channels = cf.channels,
+    patch_size = cf.patch_size[1],
+    dim = 2,
+    depth = 2,
+    num_classes = cf.num_classes
+)
+
 print(summary(model))
 optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
