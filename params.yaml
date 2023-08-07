@@ -1,0 +1,40 @@
+system:
+  traces: /data/pengmiao/ML-DPC-S0/LoadTraces 
+  processed: processed 
+  model: model
+  res: res
+
+train:
+  epochs: 30 
+  lr: 0.00001 
+  gamma: 0.1
+  step-size: 20
+  early-stop: 5 
+
+trace-data:
+  train: 1
+  total: 2 
+  skip: 0 
+  batch-size: 256
+
+model:
+  mm:
+    channels: 1
+    dim: 2 
+    depth: 2 
+  ms:
+    input_size: 100
+    hidden_size: 16 
+    num_classes: 256
+
+hardware:
+  block-bits: 6
+  total-bits: 64
+  look-back: 9
+  pred-forward: 128
+  page-bits: 12
+  delta-bound: 128
+  split-bits: 6
+  filter-size: 16
+  bitmap-size: 256 # 2 * delta-bound
+  block-num-bits: 58 # total-bits - block-bits
