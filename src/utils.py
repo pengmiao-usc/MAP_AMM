@@ -2,6 +2,7 @@ import numpy as np
 import yaml
 from models.mlp_mixer import MLPMixer
 from models.mlp_simple import MLP
+from models.mlp_teacher import MLPTeacher
 
 def select_model(option):
     with open("params.yaml", "r") as p:
@@ -32,5 +33,13 @@ def select_model(option):
             hidden_size = hidden_size,
             num_classes = num_classes
         )
-
+    elif option == "mt":
+        input_size = params["model"][f"{option}"]["input_size"]
+        hidden_size = params["model"][f"{option}"]["hidden_size"]
+        num_classes = params["model"][f"{option}"]["num_classes"]
+        return MLPTeacher(
+            input_size = input_size,
+            hidden_size = hidden_size,
+            num_classes = num_classes
+        )
 

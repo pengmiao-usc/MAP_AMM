@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 import yaml
 
 from data_loader import MAPDataset, init_dataloader
-from threshold import find_optimal_threshold
+#from threshold import find_optimal_threshold
 
 def read_load_trace_data(load_trace, num_prefetch_warmup_instructions, num_total_instructions, skipping=0):
     def process_line(line):

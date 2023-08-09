@@ -148,7 +148,7 @@ app = sys.argv[1]
 option = sys.argv[2]
 gpu_id = sys.argv[3]
 
-model = select_model(option)
+model = select_model(option.split('.')[0])
 model_save_path = os.path.join(model_dir, f"{app[:-7]}.{option}.pkl") 
 N_SUBSPACE = [2,2,2]
 K_CLUSTER = [16,16,16]
@@ -223,5 +223,5 @@ report = {
 }
 
 pprint.pprint(report,sort_dicts=False)
-with open(model_save_path+'estimator_report.json', 'w') as json_file:
+with open(model_save_path+'.estimator_report.json', 'w') as json_file:
     json.dump(report, json_file,indent=2)
