@@ -26,6 +26,5 @@ Change trace dir in `params.yaml`, then:
 To use KD, instead of 2 and 3:
 
 2. run `python src/train_kd.py {app} {tch model}/mt {stu model}/ms {gpu no.}`
-
 3. run `python src/1_mm.py {app} ms.stu {gpu no.}`
  
