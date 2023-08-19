@@ -27,6 +27,7 @@ import pdb
 from validation import run_val
 import pickle
 from torchinfo import summary
+from r import resnet_tiny,resnet14
 
 torch.manual_seed(100)
 
@@ -45,10 +46,12 @@ early_stop = cf.early_stop
 
 from mlp_simple import MLP
 
-model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)*cf.channels),
-            hidden_size = cf.dim,
-            num_classes = cf.num_classes
-            )
+# model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)*cf.channels),
+#             hidden_size = cf.dim,
+#             num_classes = cf.num_classes
+#             )
+model = resnet_tiny(cf.num_classes,cf.channels).to(device)
+#model = resnet14(cf.num_classes,cf.channels).to(device)
 print(summary(model))
 optimizer = optim.Adam(model.parameters(), lr=lr)
 scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
@@ -158,7 +161,7 @@ def save_data_for_amm(model_save_path):
         
     return
 
-#%%
+
 ##########################################################################################################
 
 
@@ -166,18 +169,19 @@ def save_data_for_amm(model_save_path):
 file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
 
 
-res_root = "../dataset/mlp_demo/410.bwaves/"
-#res_root = "../../dataset/mlp_demo/654.roms/"
+#res_root = "../dataset/mlp_demo/410.bwaves/"
+#res_root = "../dataset/resnet_demo/654.roms/"
+res_root = "./dataset/resnet_demo/410.bwaves/"
 
 if not os.path.exists(res_root):
     os.makedirs(res_root)
 
-model_save_path=res_root+"mlp_demo.pkl"
+model_save_path=res_root+"resnet_demo.pkl"
 
 log_path=model_save_path+".log"
-SKIP_NUM=0
-TRAIN_NUM = 1
-TOTAL_NUM=2
+SKIP_NUM=1
+TRAIN_NUM = 2
+TOTAL_NUM=3
 
 loading=False
 log_path=model_save_path+".log"

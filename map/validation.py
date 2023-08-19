@@ -32,7 +32,7 @@ from sklearn.metrics import roc_curve, auc
 from numpy import sqrt
 from numpy import argmax
 from threshold_throttling import threshold_throttleing
-
+from r import resnet_tiny,resnet14
 device=cf.device
 batch_size=cf.batch_size
 epochs = cf.epochs
@@ -51,10 +51,12 @@ DELTA_BOUND=cf.DELTA_BOUND
 SPLIT_BITS=cf.SPLIT_BITS
 FILTER_SIZE=cf.FILTER_SIZE
 
-model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)),
-            hidden_size = cf.dim,
-            num_classes = cf.num_classes
-            )
+# model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)),
+#             hidden_size = cf.dim,
+#             num_classes = cf.num_classes
+#             )
+
+model = resnet_tiny(cf.num_classes,cf.channels).to(device)
 
 #%%
 

@@ -47,14 +47,13 @@ def evaluate_by_score(y_score, threshold, y_label):
 
 
 def load_data_n_model(model_save_path):
-    print("loading dataset")
     tensor_dict_path = model_save_path + '.tensor_dict.pkl'
     # Load the dictionary using pickle
     with open(tensor_dict_path, 'rb') as f:
         tensor_dict = pickle.load(f)
     train_data, train_target, test_data, test_target = \
         tensor_dict['train_data'], tensor_dict['train_target'], tensor_dict['test_data'], tensor_dict['test_target']
-    print("loading model")
+
     # define and load model
     model.load_state_dict(torch.load(model_save_path))
     all_params = list(model.named_parameters())
@@ -85,7 +84,6 @@ def mlp_inference_by_layers(input_data):
 
 
 def validate_whole_model_vs_layers(train_data, train_target, test_data, test_target, best_threshold):
-    print("validating layered models")
     y_score_by_whole_train = model(train_data).detach().numpy()
     y_score_by_whole_test = model(test_data).detach().numpy()
 
@@ -94,32 +92,28 @@ def validate_whole_model_vs_layers(train_data, train_target, test_data, test_tar
 
     y_score_by_layer_train = mlp_inf_layer_res_train[-1].detach().numpy()
     y_score_by_layer_test = mlp_inf_layer_res_test[-1].detach().numpy()
-    
-    #print("whole model and layered model performance for training dataset:\n")
 
-    #f1_w_tr = evaluate_by_score(y_score_by_whole_train, best_threshold, train_target)
-    #f1_l_tr = evaluate_by_score(y_score_by_layer_train, best_threshold, train_target)
+    f1_w_tr = evaluate_by_score(y_score_by_whole_train, best_threshold, train_target)
+    f1_l_tr = evaluate_by_score(y_score_by_layer_train, best_threshold, train_target)
 
-    print("whole model and layered model performance for testing dataset:")
-    
     f1_w_ts = evaluate_by_score(y_score_by_whole_test, best_threshold, test_target)
     f1_l_ts = evaluate_by_score(y_score_by_layer_test, best_threshold, test_target)
 
     def are_vectors_equal(vector1, vector2, tolerance=1e-9):
         return all(abs(x - y) < tolerance for x, y in zip(vector1, vector2))
 
-    #if are_vectors_equal(f1_w_tr, f1_l_tr) and are_vectors_equal(f1_w_ts, f1_l_ts) :
-    if are_vectors_equal(f1_w_ts, f1_l_ts) :
+    if are_vectors_equal(f1_w_tr, f1_l_tr) and are_vectors_equal(f1_w_ts, f1_l_ts) :
         print("Layer Validation Success: the whole model and layered model are nearly identical.")
     else:
         print("Layer Validation Fail! The models are different! ")
 
-    return mlp_inf_layer_res_train, mlp_inf_layer_res_test, f1_l_ts
+    return mlp_inf_layer_res_train, mlp_inf_layer_res_test, f1_l_tr, f1_l_ts
 
 
 def layer_estimator(X_train, X_test, W, bias, act_fn, n=2, k=16):
     est = vq_amm.PQMatmul(ncodebooks=n, ncentroids=k)  # k must >= 16
     est.fit(X_train, W)
+    #X_train.shape: (88462, 100), W.shape: (100, 64), output: (88462, 64)
     est_hat_train = _eval_amm_layer(est, X_train, W)
     est_hat_test = _eval_amm_layer(est, X_test, W)
     est_hat_output_train = act_fn(torch.Tensor(est_hat_train)+bias)
@@ -157,12 +151,12 @@ def layer_cossim(mlp_layer_exact_res_train,mlp_layer_exact_res_test, est_l1_res,
 
 #model_save_path = "../dataset/mlp_demo/654.roms/mlp_demo.pkl"
 model_save_path = "../dataset/mlp_demo/410.bwaves/mlp_demo.pkl"
-N_SUBSPACE = [2,2,2]
+N_SUBSPACE = [4,4,4]
 K_CLUSTER = [16,16,16]
 
 
 train_data, train_target, test_data, test_target, all_params, best_threshold = load_data_n_model(model_save_path)
-mlp_layer_exact_res_train, mlp_layer_exact_res_test, f1_l_ts = validate_whole_model_vs_layers(
+mlp_layer_exact_res_train, mlp_layer_exact_res_test, f1_l_tr, f1_l_ts = validate_whole_model_vs_layers(
                                                         train_data, train_target,test_data, test_target, best_threshold)
 
 est_l1_res = layer_estimator(X_train=mlp_layer_exact_res_train[0].detach().numpy(),

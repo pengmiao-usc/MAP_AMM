@@ -129,8 +129,9 @@ class MultiCodebookEncoder(abc.ABC):
         for i, lut in enumerate(Q_luts):
             centroid_dists = lut.ravel()[X_enc.ravel()]
             dists = centroid_dists.reshape(X_enc.shape)
+            #(batch, n_subspace): (88462, 4)
             if self.upcast_every < 2 or not self.quantize_lut:
-                dists = dists.sum(axis=-1)
+                dists = dists.sum(axis=-1)#(88462,)
             else:
                 dists = dists.reshape(dists.shape[0], -1, self.upcast_every)
                 if self.accumulate_how == 'sum':
@@ -166,6 +167,29 @@ class MultiCodebookEncoder(abc.ABC):
             all_dists[i] = dists
 
         return all_dists.T
+
+    def dists_enc_cnn(self, X_enc, Q_luts, unquantize=False,
+                          offset=None, scale=None):
+        X_enc = np.ascontiguousarray(X_enc)
+
+        if unquantize:
+            offset = self.total_lut_offset if offset is None else offset
+            scale = self.scale_by if scale is None else scale
+
+        all_dists = np.empty((len(Q_luts),  len(X_enc)), dtype=np.float32)
+
+        for i, lut in enumerate(Q_luts):
+            centroid_dists = lut.ravel()[X_enc.ravel()]
+            dists = centroid_dists.reshape(X_enc.shape)
+            dists = dists.sum(axis=-1)
+            #dists = np.concatenate((dists))
+
+            if self.quantize_lut and unquantize:
+                # dists = (dists / self.scale_by) + self.total_lut_offset
+                dists = (dists / scale) + offset
+            all_dists[i] = dists
+
+        return all_dists.T.reshape(len(X_enc),-1,len(Q_luts))
 
 
 # ------------------------------------------------ Product Quantization
@@ -255,7 +279,7 @@ class PQEncoder(MultiCodebookEncoder):
         Q = self._pad_ncols(Q)
 
         luts = np.zeros((Q.shape[0], self.ncodebooks, self.ncentroids))
-        # print("Q shape: ", Q.shape) Q(10,512)
+        # print("Q shape: ", Q.shape) Q(64, 100)
         for i, q in enumerate(Q):
             lut = _fit_pq_lut(q, centroids=self.centroids,
                               elemwise_dist_func=self.elemwise_dist_func)
@@ -272,6 +296,83 @@ class PQEncoder(MultiCodebookEncoder):
         idxs = pq._encode_X_pq(X, codebooks=self.centroids)
 
         return idxs + self.offsets  # offsets let us index into raveled dists
+
+
+## CNN
+
+def _fit_pq_lut_cnn(q, centroids):
+    _, ncodebooks, subvect_len = centroids.shape
+    q = q.reshape((1, ncodebooks, subvect_len))
+    q_dists = np.sum(centroids * q, axis=-1) #dists: distribution?
+    #q_dists: (16,2): ncentroids row, ncodebooks column table
+    return q_dists  # ncentroids, ncodebooks, row-major
+
+
+
+class PQEncoder_CNN(MultiCodebookEncoder):
+
+    #mark:ncentroids=256
+    def __init__(self, ncodebooks, ncentroids=16,
+                 elemwise_dist_func=dists_elemwise_dot,
+                 preproc='PQ', encode_algo=None, quantize_lut=False,
+                 upcast_every=-1, accumulate_how='sum',
+                 **preproc_kwargs):
+        super().__init__(
+            ncodebooks=ncodebooks, ncentroids=ncentroids,
+            quantize_lut=quantize_lut, upcast_every=upcast_every,
+            accumulate_how=accumulate_how)
+        self.elemwise_dist_func = elemwise_dist_func
+        self.preproc = preproc
+        self.encode_algo = encode_algo
+        self.preproc_kwargs = preproc_kwargs
+
+    def _pad_ncols(self, X):
+        return ensure_num_cols_multiple_of(X, self.ncodebooks)
+
+    def fit(self, X, Q=None):#kmeans learn centroids
+        self.subvect_len = int(np.ceil(X.shape[1] / self.ncodebooks))
+        X = self._pad_ncols(X)
+        self.centroids = None
+        if self.centroids is None:
+            self.centroids = _learn_centroids(
+                X, self.ncentroids, self.ncodebooks, self.subvect_len)
+
+    def name(self):
+        return "{}_{}".format(self.preproc, super().name())
+
+    def params(self):
+        d = super().params()
+        d['_preproc'] = self.preproc
+        return d
+
+    def encode_Q(self, Q, quantize=True):#weight * centoids -> lut
+        # quantize param enables quantization if set in init; separate since
+        # quantization learning needs to call this func, but vars like
+        # lut_offsets aren't set when this function calls it
+
+        #Q = np.repeat(Q, self.ncodebooks, axis=0).transpose() #Q:(9,4).
+
+        Q = np.atleast_2d(Q)
+        Q = self._pad_ncols(Q)
+        luts = np.zeros((Q.shape[0], self.ncodebooks, self.ncentroids))
+        # print("Q shape: ", Q.shape) Q(900,4)
+        for i, q in enumerate(Q):
+            lut = _fit_pq_lut_cnn(q, centroids=self.centroids)
+            if self.quantize_lut and quantize:
+                lut = np.maximum(0, lut - self.lut_offsets)
+                lut = np.floor(lut * self.scale_by).astype(np.int)
+                lut = np.minimum(lut, 255)
+            luts[i] = lut.T
+            #(4, 100, 16)
+        return luts
+
+    def encode_X(self, X, **sink):#x->closest centroids->indexes
+        X = self._pad_ncols(X)
+
+        idxs = pq._encode_X_pq(X, codebooks=self.centroids)
+
+        return idxs + self.offsets  # offsets let us index into raveled dists
+
 
 
 def main():

@@ -56,6 +56,13 @@ class VQMatmul(amm.ApproxMatmul, abc.ABC):
             self.set_B(B)
         return self.enc.dists_enc(self.A_enc, self.luts)
 
+    def predict_cnn(self, A, B):
+        if self.A_enc is None:
+            self.A_enc = self.enc.encode_X(A)
+        if self.luts is None:
+            self.luts = self.enc.encode_Q(B.T)
+        return self.enc.dists_enc_cnn(self.A_enc, self.luts)
+
     def get_params(self):
         return {'ncodebooks': self.ncodebooks}
 
