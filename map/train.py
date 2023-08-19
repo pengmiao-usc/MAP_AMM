@@ -175,9 +175,9 @@ if not os.path.exists(res_root):
 model_save_path=res_root+"mlp_demo.pkl"
 
 log_path=model_save_path+".log"
-SKIP_NUM=0
-TRAIN_NUM = 1
-TOTAL_NUM=2
+SKIP_NUM=1
+TRAIN_NUM = 5
+TOTAL_NUM=8
 
 loading=False
 log_path=model_save_path+".log"
