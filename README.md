@@ -1,5 +1,5 @@
 # MAP_AMM
-Memory access prediction using table approximate matrix multiplication.
+Memory access prediction using table approximate matrix multiplication: MLP, ResNet.
 
 Change trace dir in train.py, then:
 1. run `train.py` in `map` folder to train a model and ouput dataset
