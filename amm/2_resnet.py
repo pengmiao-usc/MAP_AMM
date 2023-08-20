@@ -29,7 +29,7 @@ total_params = sum(p.numel() for p in model.parameters())
 N_SUBSPACE=[2]*5
 K_CLUSTER=[16]*5
 
-N_Train, N_Test = -5000,-2000 # -1 if using all data
+N_Train, N_Test = -1,-1 # -1 if using all data
 
 ##
 def evaluate(y_test,y_pred_bin):

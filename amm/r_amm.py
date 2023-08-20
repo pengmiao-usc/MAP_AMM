@@ -211,7 +211,7 @@ class ResNet_Tiny_Manual():
         if stride == 1:
             x += input_data
         else:
-            res = self.resnet_im2col_conv_bn_fold_amm(input_data, *weights[6:9], *bn_buffer[4:6], ncodebooks=n, ncentroids=k,
+            res = self.resnet_im2col_conv_bn_fold_amm(input_data, *weights[6:9], *bn_buffer[4:6], ncodebooks=1, ncentroids=k,
                                                 padding=0, stride=stride)
             x += res
 
@@ -229,7 +229,7 @@ class ResNet_Tiny_Manual():
         if stride == 1:
             x += input_data
         else:
-            x += self.resnet_im2col_conv_bn_fold_amm(input_data, *weights[6:9], *bn_buffer[4:6], ncodebooks=n, ncentroids=k,
+            x += self.resnet_im2col_conv_bn_fold_amm(input_data, *weights[6:9], *bn_buffer[4:6], ncodebooks=1, ncentroids=k,
                                          padding=0, stride=stride, est=self.amm_est_queue.pop(0))
         x = self.relu(0, x)
         return x
