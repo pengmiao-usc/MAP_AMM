@@ -171,7 +171,7 @@ file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.
 
 #res_root = "../dataset/mlp_demo/410.bwaves/"
 #res_root = "../dataset/resnet_demo/654.roms/"
-res_root = "./dataset/resnet_demo/410.bwaves/"
+res_root = "../dataset/resnet_demo/410.bwaves/"
 
 if not os.path.exists(res_root):
     os.makedirs(res_root)
