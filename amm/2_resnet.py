@@ -26,10 +26,10 @@ import math
 model = resnet_tiny(cf.num_classes,cf.channels)
 summary(model)
 total_params = sum(p.numel() for p in model.parameters())
-N_SUBSPACE=[2]*5
-K_CLUSTER=[16]*5
+N_SUBSPACE=[4]*5
+K_CLUSTER=[256]*5
 
-N_Train, N_Test = -1,-1 # -1 if using all data
+N_Train, N_Test = 2000,1000 # -1 if using all data
 
 ##
 def evaluate(y_test,y_pred_bin):
@@ -85,7 +85,9 @@ def load_data_n_model(model_save_path):
 # load model and data
 
 #model_save_path = "../dataset/resnet_demo/654.roms/resnet_demo.pkl"
-model_save_path = "./dataset/resnet_demo/410.bwaves/resnet_demo.pkl"
+model_save_path = "../dataset/resnet_demo/410.bwaves/resnet_demo.pkl"
+
+output_path = "../dataset/resnet_demo/410.bwaves/resnet_report_4_256.json"
 
 train_data, train_target, test_data, test_target, model_state_dict, best_threshold = load_data_n_model(model_save_path)
 train_data, train_target, test_data, test_target = train_data[:N_Train], train_target[:N_Train], test_data[:N_Test], test_target[:N_Test]
@@ -146,7 +148,7 @@ report = {
 }
 
 pprint.pprint(report,sort_dicts=False)
-with open(model_save_path+'.estimator_report.json', 'w') as json_file:
+with open(output_path, 'w') as json_file:
     json.dump(report, json_file,indent=2)
 
 
