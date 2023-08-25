@@ -1,4 +1,3 @@
-##
 import sys
 import os
 import pandas as pd
@@ -12,7 +11,7 @@ import pprint
 import yaml
 from sklearn.metrics import f1_score,recall_score,precision_score
 
-from utils import select_model
+from utils import select_model, replace_directory
 from metrics import _cossim
 import vq_amm
 
@@ -37,7 +36,7 @@ def evaluate_by_score(y_score, threshold, y_label):
     p, r, f1 = evaluate(y_label, y_pred_bin)
     return [p, r, f1]
 
-def load_data_n_model(model_save_path):
+def load_data_n_model(model_save_path, res_path):
     tensor_dict_path = model_save_path + '.tensor_dict.pkl'
     # Load the dictionary using pickle
     with open(tensor_dict_path, 'rb') as f:
@@ -49,14 +48,25 @@ def load_data_n_model(model_save_path):
     model.load_state_dict(torch.load(model_save_path))
     all_params = list(model.named_parameters())
 
-    # load csv for threshold
-    # df_threshold = pd.read_csv(model_save_path+".val_res.csv", header=0, sep=" ")
-    # best_threshold = df_threshold.opt_th.values[0]
-    best_threshold = 0.5
+    # load json in res dir. for threshold
+    with open(res_path+".val_res.json", "r") as json_file:
+        data = json.load(json_file)
+    
+    validation_list = data.get("validation")
+    best_threshold = validation_list[0].get("threshold")
+#    highest_f1 = -1  
+#    best_threshold = None
+
+#    for entry in validation_list:
+#        f1 = entry.get("f1")
+#        threshold = entry.get("threshold")
+#        
+#        if f1 is not None and f1 > highest_f1:
+#            highest_f1 = f1
+#            best_threshold = threshold
     return train_data, train_target, test_data, test_target, all_params, best_threshold
 
 ## Build a func. to pick layers to matmul vs. estimating
-
 def mlp_inference_by_layers(input_data):
     mlp_flatten = nn.Flatten()
     mlp_relu = nn.ReLU()
@@ -70,18 +80,11 @@ def mlp_inference_by_layers(input_data):
     layer2_output_activated = mlp_relu(layer2_output)
 
     layer3_output = torch.matmul(layer2_output_activated, all_params[4][1].t()) + all_params[5][1]
-    layer3_output_activated = mlp_relu(layer3_output)
-    
-    layer4_output = torch.matmul(layer3_output_activated, all_params[6][1].t()) + all_params[7][1]
-    layer4_output_activated = mlp_relu(layer4_output)
-    
-    layer5_output = torch.matmul(layer4_output_activated, all_params[8][1].t()) + all_params[9][1]
-    layer5_output_activated = mlp_relu(layer5_output)
+    layer3_output_activated = mlp_sigmoid(layer3_output)
 
-    layer6_output = torch.matmul(layer5_output_activated, all_params[10][1].t()) + all_params[11][1]
-    layer6_output_activated = mlp_sigmoid(layer6_output)
+    return [model_input, layer1_output, layer1_output_activated, layer2_output,
+            layer2_output_activated, layer3_output, layer3_output_activated]
 
-    return [model_input, layer1_output, layer1_output_activated, layer2_output, layer2_output_activated, layer3_output, layer3_output_activated, layer4_output, layer4_output_activated, layer5_output, layer5_output_activated, layer6_output, layer6_output_activated]
 
 def validate_whole_model_vs_layers(train_data, train_target, test_data, test_target, best_threshold):
     y_score_by_whole_train = model(train_data).detach().numpy()
@@ -113,6 +116,7 @@ def validate_whole_model_vs_layers(train_data, train_target, test_data, test_tar
 def layer_estimator(X_train, X_test, W, bias, act_fn, n=2, k=16):
     est = vq_amm.PQMatmul(ncodebooks=n, ncentroids=k)  # k must >= 16
     est.fit(X_train, W)
+    #X_train.shape: (88462, 100), W.shape: (100, 64), output: (88462, 64)
     est_hat_train = _eval_amm_layer(est, X_train, W)
     est_hat_test = _eval_amm_layer(est, X_test, W)
     est_hat_output_train = act_fn(torch.Tensor(est_hat_train)+bias)
@@ -120,9 +124,9 @@ def layer_estimator(X_train, X_test, W, bias, act_fn, n=2, k=16):
     return [est, est_hat_train, est_hat_test, est_hat_output_train.detach().numpy(), est_hat_output_test.detach().numpy()]
 
 
-def layer_cossim(mlp_layer_exact_res_train,mlp_layer_exact_res_test, est_l1_res, est_l2_res, est_l3_res, est_l4_res, est_l5_res, est_l6_res):
-    cossim_layer_train = [0] * 6 
-    cossim_layer_test = [0] * 6 
+def layer_cossim(mlp_layer_exact_res_train,mlp_layer_exact_res_test, est_l1_res, est_l2_res, est_l3_res):
+    cossim_layer_train = [0] * 3
+    cossim_layer_test = [0] * 3
     cossim_layer_train[0] = _cossim(mlp_layer_exact_res_train[2].detach().numpy(), est_l1_res[-2])
     cossim_layer_test[0] = _cossim(mlp_layer_exact_res_test[2].detach().numpy(), est_l1_res[-1])
     print("layer1 cos similarity on train data:", cossim_layer_train[0])
@@ -137,22 +141,7 @@ def layer_cossim(mlp_layer_exact_res_train,mlp_layer_exact_res_test, est_l1_res,
     cossim_layer_test[2] = _cossim(mlp_layer_exact_res_test[6].detach().numpy(), est_l3_res[-1])
     print("layer3 cos similarity on train data:", cossim_layer_train[2])
     print("layer3 cos similarity on test data:", cossim_layer_test[2])
-
-    cossim_layer_train[3] = _cossim(mlp_layer_exact_res_train[8].detach().numpy(), est_l4_res[-2])
-    cossim_layer_test[3] = _cossim(mlp_layer_exact_res_test[8].detach().numpy(), est_l4_res[-1])
-    print("layer4 cos similarity on train data:", cossim_layer_train[3])
-    print("layer4 cos similarity on test data:", cossim_layer_test[3])
-
-    cossim_layer_train[4] = _cossim(mlp_layer_exact_res_train[10].detach().numpy(), est_l5_res[-2])
-    cossim_layer_test[4] = _cossim(mlp_layer_exact_res_test[10].detach().numpy(), est_l5_res[-1])
-    print("layer5 cos similarity on train data:", cossim_layer_train[4])
-    print("layer5 cos similarity on test data:", cossim_layer_test[4])
-
-    cossim_layer_train[5] = _cossim(mlp_layer_exact_res_train[12].detach().numpy(), est_l6_res[-2])
-    cossim_layer_test[5] = _cossim(mlp_layer_exact_res_test[12].detach().numpy(), est_l6_res[-1])
-    print("layer6 cos similarity on train data:", cossim_layer_train[5])
-    print("layer6 cos similarity on test data:", cossim_layer_test[5])
-
+    
     return [float(value) for value in cossim_layer_train], [float(value) for value in cossim_layer_test]
 
 
@@ -166,18 +155,25 @@ with open("params.yaml", "r") as p:
     params = yaml.safe_load(p)
 
 model_dir = params["system"]["model"]
+res_dir = params["system"]["res"]
+
 app = sys.argv[1]
 option = sys.argv[2]
 gpu_id = sys.argv[3]
 
-model = select_model(option)
-model_save_path = os.path.join(model_dir, f"{app[:-7]}.{option}.pkl") 
-N_SUBSPACE = [2,2,2,2,2,2]
-K_CLUSTER = [16,16,16,16,16,16]
 
-train_data, train_target, test_data, test_target, all_params, best_threshold = load_data_n_model(model_save_path)
-mlp_layer_exact_res_train, mlp_layer_exact_res_test, f1_l_tr, f1_l_ts = validate_whole_model_vs_layers(
-                                                        train_data, train_target,test_data, test_target, best_threshold)
+K_CLUSTER = [int(c) for c in sys.argv[4].split(",")]
+N_SUBSPACE = [int(d) for d in sys.argv[5].split(",")]
+
+model = select_model(option.split(".")[0])
+model_save_path = os.path.join(model_dir, f"{app[:-7]}.{option}.pkl") 
+res_path = replace_directory(model_save_path, res_dir) 
+
+train_data, train_target, test_data, test_target, all_params, best_threshold = load_data_n_model(model_save_path, res_path)
+
+res_path += ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPACE))
+
+mlp_layer_exact_res_train, mlp_layer_exact_res_test, f1_l_tr, f1_l_ts = validate_whole_model_vs_layers(train_data, train_target,test_data, test_target, best_threshold)
 
 est_l1_res = layer_estimator(X_train=mlp_layer_exact_res_train[0].detach().numpy(),
                              X_test=mlp_layer_exact_res_test[0].detach().numpy(),
@@ -200,60 +196,35 @@ est_l3_res = layer_estimator(X_train=mlp_layer_exact_res_train[4].detach().numpy
                              X_test=est_l2_res[-1], #output of layer2
                              W=all_params[4][1].t().detach().numpy(),
                              bias=all_params[5][1],
-                             act_fn=nn.ReLU(),
+                             act_fn=nn.Sigmoid(),
                              n=N_SUBSPACE[2],
                              k=K_CLUSTER[2])
 
-est_l4_res = layer_estimator(X_train=mlp_layer_exact_res_train[6].detach().numpy(),
-                             X_test=est_l3_res[-1], #output of layer3 
-                             W=all_params[6][1].t().detach().numpy(),
-                             bias=all_params[7][1],
-                             act_fn=nn.ReLU(),
-                             n=N_SUBSPACE[3],
-                             k=K_CLUSTER[3])
-
-est_l5_res = layer_estimator(X_train=mlp_layer_exact_res_train[8].detach().numpy(),
-                             X_test=est_l4_res[-1], #output of layer4 
-                             W=all_params[8][1].t().detach().numpy(),
-                             bias=all_params[9][1],
-                             act_fn=nn.ReLU(),
-                             n=N_SUBSPACE[4],
-                             k=K_CLUSTER[4])
-
-est_l6_res = layer_estimator(X_train=mlp_layer_exact_res_train[10].detach().numpy(),
-                             X_test=est_l5_res[-1], #output of layer5 
-                             W=all_params[10][1].t().detach().numpy(),
-                             bias=all_params[11][1],
-                             act_fn=nn.Sigmoid(),
-                             n=N_SUBSPACE[5],
-                             k=K_CLUSTER[5])
-
-cossim_layer_train,cossim_layer_test = layer_cossim(mlp_layer_exact_res_train,mlp_layer_exact_res_test,
-                                                    est_l1_res, est_l2_res, est_l3_res, est_l4_res, est_l5_res, est_l6_res)
+cossim_layer_train, cossim_layer_test = layer_cossim(mlp_layer_exact_res_train,mlp_layer_exact_res_test, est_l1_res, est_l2_res, est_l3_res)
 
 print("exact p,r,f1: \n",f1_l_ts)
 print("amm estimation:")
-f1_est_ts = evaluate_by_score(est_l6_res[-1],best_threshold,test_target)
+f1_est_ts = evaluate_by_score(est_l3_res[-1],best_threshold,test_target)
 
 ## size analysis
-
 summary(model)
 total_params = sum(p.numel() for p in model.parameters())
 print ("MLP total parameters:", total_params)
 
 # table size
-lut_l1, lut_l2, lut_l3, lut_l4, lut_l5, lut_l6=est_l1_res[0].luts, est_l2_res[0].luts, est_l3_res[0].luts, est_l4_res[0].luts, est_l5_res[0].luts, est_l6_res[0].luts
-print("LUT shapes = (output dimension, k clusters, n subspaces):", lut_l1.shape, lut_l2.shape, lut_l3.shape, lut_l4.shape, lut_l5.shape, lut_l6.shape)
-lut_total_size =  lut_l1.size + lut_l2.size + lut_l3.size + lut_l4.size + lut_l5.size + lut_l6.size
+lut_l1, lut_l2, lut_l3=est_l1_res[0].luts, est_l2_res[0].luts, est_l3_res[0].luts
+print("LUT shapes = (output dimension, k clusters, n subspaces):", lut_l1.shape, lut_l2.shape, lut_l3.shape)
+lut_total_size =  lut_l1.size + lut_l2.size + lut_l3.size
 print("LUT total size = ", lut_total_size)
 
 #%%
 ## output report
 report = {
     'model': {
-        'name': 'MLPTeacher',
-        'layer': 6,
-        'dim': params['model']['mt']['hidden_size'],
+        'name': 'MLP',
+        'threshold': best_threshold, 
+        'layer': 3,
+        'dim': params['model']['ms']['hidden_size'],
         'f1': f1_l_ts,
         'num_param': total_params
     },
@@ -269,5 +240,5 @@ report = {
 }
 
 pprint.pprint(report,sort_dicts=False)
-with open(model_save_path+'.estimator_report.json', 'w') as json_file:
+with open(res_path+'.amm_report.json', 'w') as json_file:
     json.dump(report, json_file,indent=2)

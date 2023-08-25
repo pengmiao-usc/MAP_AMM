@@ -6,7 +6,7 @@ import yaml
 from models.mlp_mixer import MLPMixer
 from models.mlp_simple import MLP
 from models.mlp_teacher import MLPTeacher
-from models.r import resnet34 
+from models.resnet import resnet_tiny, resnet50 
 
 def select_model(option):
     with open("params.yaml", "r") as p:
@@ -48,12 +48,10 @@ def select_model(option):
         )
     elif option == "rs":
         channels = params["model"][option]["channels"]
-        dim = params["model"][option]["dim"]
-        return resnet34(num_classes, channels) 
+        return resnet_tiny(num_classes, channels) 
     elif option == "rt":
         channels = params["model"][option]["channels"]
-        dim = params["model"][option]["dim"]
-        return resnet34(num_classes, channels) 
+        return resnet50(num_classes, channels) 
 
 
 def replace_directory(path, new_directory):

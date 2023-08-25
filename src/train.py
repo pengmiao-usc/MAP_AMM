@@ -22,7 +22,7 @@ torch.manual_seed(100)
 model = None
 optimizer = None
 scheduler = None
-
+device = None
 #log = config.Logger()
 
 def train(ep, train_loader, model_save_path):
@@ -66,7 +66,7 @@ def run_epoch(epochs, early_stop, loading, model_save_path, train_loader, test_l
     curr_early_stop = early_stop
 
     metrics_data = []
-
+    model.to(device)
     for epoch in range(epochs):
         print(f"------- START EPOCH {epoch+1} -------")
         train_loss=train(epoch,train_loader,model_save_path)
@@ -130,7 +130,8 @@ def main():
     global model
     global optimizer
     global scheduler
-
+    global device
+    
     with open("params.yaml", "r") as p:
         params = yaml.safe_load(p)
 

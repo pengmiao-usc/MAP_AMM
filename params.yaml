@@ -39,10 +39,8 @@ model:
     num_classes: 256
   rs:
     channels: 1
-    dim: 4
   rt:
     channels: 1
-    dim: 30 
 
 simulator:
   degree: 16
