@@ -1,8 +1,12 @@
 import numpy as np
+import json
+import os
 import yaml
+
 from models.mlp_mixer import MLPMixer
 from models.mlp_simple import MLP
 from models.mlp_teacher import MLPTeacher
+from models.r import resnet34 
 
 def select_model(option):
     with open("params.yaml", "r") as p:
@@ -42,4 +46,20 @@ def select_model(option):
             hidden_size = hidden_size,
             num_classes = num_classes
         )
+    elif option == "rs":
+        channels = params["model"][option]["channels"]
+        dim = params["model"][option]["dim"]
+        return resnet34(num_classes, channels) 
+    elif option == "rt":
+        channels = params["model"][option]["channels"]
+        dim = params["model"][option]["dim"]
+        return resnet34(num_classes, channels) 
+
+
+def replace_directory(path, new_directory):
+    parts = path.split('/')
+    parts[-2] = new_directory
+    new_path = '/'.join(parts)
+    return new_path
+
 

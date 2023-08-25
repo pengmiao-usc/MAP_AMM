@@ -201,7 +201,7 @@ def main():
     loading = False
 
     run_epoch(epochs, early_stop, alpha, loading, model_save_path, train_loader, test_loader, teacher_model, gpu_id)
-    run_val(test_loader, test_df, app, model_save_path, option, gpu_id)
+    run_val(test_loader, train_loader, test_df, app, model_save_path, option, gpu_id)
     save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
 
 if __name__ == "__main__":

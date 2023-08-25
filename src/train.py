@@ -14,6 +14,7 @@ from torchinfo import summary
 
 from data_loader import init_dataloader
 from utils import select_model 
+from threshold import find_optimal_threshold
 from validate import run_val
 
 torch.manual_seed(100)
@@ -150,7 +151,9 @@ def main():
     gamma = params["train"]["gamma"]
     step_size = params["train"]["step-size"]
     early_stop = params["train"]["early-stop"]
-
+    
+    threshold_samples = params["threshold"]["samples"]
+    
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
 
     os.makedirs(os.path.join(model_dir), exist_ok=True)
@@ -176,7 +179,7 @@ def main():
     loading = False
 
     run_epoch(epochs, early_stop, loading, model_save_path, train_loader, test_loader, gpu_id)
-    run_val(test_loader, test_df, app, model_save_path, option, gpu_id)
+    run_val(test_loader, train_loader, test_df, app, model_save_path, option, gpu_id)
     save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
 
 if __name__ == "__main__":

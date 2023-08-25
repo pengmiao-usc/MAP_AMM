@@ -40,6 +40,24 @@ class MAPDataset(Dataset):
         past_tensor=torch.Tensor(data).to(device)
         
         future_tensor=torch.Tensor(future_b).to(device)
-
         
         return past_tensor, future_tensor
+
+class MAPDataset_gen(Dataset):
+    def __init__(self, df):
+        self.past=list(df["past"].values)
+   
+    def __getitem__(self, idx):
+        past = self.past[idx]
+        return [past]
+
+    def __len__(self):
+        return len(self.past)
+    
+    def collate_fn(self, batch):
+        
+        past_b = [x[0] for x in batch]
+        data=rearrange(np.array(past_b), '(b c) h w-> b c h w', c=channels, h=image_size[0], w=image_size[1])
+        past_tensor=torch.Tensor(data).to(device)
+    
+        return past_tensor

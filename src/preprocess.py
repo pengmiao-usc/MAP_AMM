@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader
 import yaml
 
 from data_loader import MAPDataset, init_dataloader
-#from threshold import find_optimal_threshold
 
 def read_load_trace_data(load_trace, num_prefetch_warmup_instructions, num_total_instructions, skipping=0):
     def process_line(line):
@@ -172,6 +171,49 @@ def preprocessing(data, hardware):
        'page_address', 'page_offset', 'block_index', 'block_addr_delta',
        'patch','past','past_block_addr','past_ip','past_page','past_delta','future']]
 
+def preprocessing_gen(data, hardware):
+    BLOCK_BITS, PAGE_BITS, BLOCK_NUM_BITS, SPLIT_BITS, LOOK_BACK, PRED_FORWARD, DELTA_BOUND, BITMAP_SIZE = hardware["block-bits"], hardware["page-bits"], hardware["block-num-bits"], hardware["split-bits"], hardware["look-back"], hardware["pred-forward"], hardware["delta-bound"], hardware["bitmap-size"]
+    
+    print("preprocessing_gen with context")
+    df=pd.DataFrame(data)
+    df.columns=["id", "cycle", "addr", "ip", "hit"]
+    df['raw']=df['addr']
+    df['block_address'] = [x>>BLOCK_BITS for x in df['raw']]
+    df['page_address'] = [ x >> PAGE_BITS for x in df['raw']]
+    #df['page_address_str'] = [ "%d" % x for x in df['page_address']]
+    df['page_offset'] = [x- (x >> PAGE_BITS<<PAGE_BITS) for x in df['raw']]
+    df['block_index'] = [int(x>> BLOCK_BITS) for x in df['page_offset']]  
+    #df["block_address_bin"]=df.apply(lambda x: convert_to_binary(x['block_address'],BLOCK_NUM_BITS),axis=1)
+    df['block_addr_delta']=df['block_address'].diff()
+    
+    df['patch']=df.apply(lambda x: split_to_words(x['block_address'],BLOCK_NUM_BITS,SPLIT_BITS),axis=1)
+    # past
+    
+    for i in range(LOOK_BACK):
+        df['patch_past_%d'%(i+1)]=df['patch'].shift(periods=(i+1))
+        df['ip_past_%d'%(i+1)]=df['ip'].shift(periods=(i+1))
+        df['page_past_%d'%(i+1)]=df['page_address'].shift(periods=(i+1))
+    
+    #Pem, update, debug 2019/09/18
+    past_name=['patch_past_%d'%(i) for i in range(LOOK_BACK,0,-1)]
+    past_ip_name=['ip_past_%d'%(i) for i in range(LOOK_BACK,0,-1)]
+    past_page_name=['page_past_%d'%(i) for i in range(LOOK_BACK,0,-1)]
+    past_name.append('patch')
+    past_ip_name.append('ip')
+    past_page_name.append('page_address')
+    #Pem, update done
+    
+    df["past"]=df[past_name].values.tolist()
+    df["past_ip_abs"]=df[past_ip_name].values.tolist()
+    df["past_page_abs"]=df[past_page_name].values.tolist()
+    
+    df=df.dropna()
+    df['past_ip']=df.apply(lambda x: ip_list_norm(x['past_ip_abs'],16),axis=1)
+    df['past_page']=df.apply(lambda x: page_list_norm(x['past_page_abs'],x['page_address']),axis=1)
+   
+    return df[['id', 'cycle', 'addr', 'ip', 'hit', 'raw', 'block_address',
+       'page_address', 'page_offset', 'block_index', 'block_addr_delta',
+       'patch','past','past_ip','past_page']]
 
 def main():
     with open("params.yaml", "r") as p:
@@ -209,9 +251,6 @@ def main():
     test_loader_stu = DataLoader(test_MAP_stu, batch_size=n_batch, shuffle=False, collate_fn=test_MAP_stu.collate_fn)
     train_loader_stu= DataLoader(train_MAP_stu, batch_size=n_batch, shuffle=True, collate_fn=train_MAP_stu.collate_fn)
     
-#    threshold = find_optimal_threshold(df_train, num_samples=100)
-#    print("threshold", threshold)
-
     with torch.no_grad():
         torch.save(train_loader_stu, os.path.join(processed_dir, f"{app_name}.train.pt"))
         torch.save(test_loader_stu, os.path.join(processed_dir, f"{app_name}.test.pt"))

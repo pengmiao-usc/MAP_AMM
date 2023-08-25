@@ -1,15 +1,17 @@
+import csv
 import json
 import os
-
+import pprint
+import yaml
 import numpy as np
 from numpy import nanargmax, sqrt
 import pandas as pd
 import torch
 from tqdm import tqdm
 from sklearn.metrics import auc, f1_score, precision_score, recall_score, precision_recall_curve, roc_curve
-import yaml
 
-from utils import select_model 
+from utils import select_model, replace_directory 
+from threshold import find_optimal_threshold
 
 model = None
 device = None
@@ -82,7 +84,7 @@ def threshold_throttleing(test_df,throttle_type="f1",optimal_type="micro",topk=2
         fscore["micro"] = (2 * p["micro"] * r["micro"]) / (p["micro"] + r["micro"])
         ix["micro"]=nanargmax(fscore["micro"])
         best_threshold=threshold["micro"][ix["micro"]]
-        # print('Best micro threshold=%f, fscore=%.3f' %(best_threshold, fscore["micro"][ix["micro"]]))
+        print('Best micro threshold=%f, fscore=%.3f' %(best_threshold, fscore["micro"][ix["micro"]]))
         y_pred_bin = (y_score-best_threshold >0)*1
         test_df["predicted"]= list(y_pred_bin)
         
@@ -93,7 +95,7 @@ def threshold_throttleing(test_df,throttle_type="f1",optimal_type="micro",topk=2
         test_df["predicted"]= list(y_pred_bin)
         
     elif throttle_type =="fixed_threshold":
-        # print("throttleing by fixed threshold:",threshold)
+        print("throttleing by fixed threshold:",threshold)
         best_threshold=threshold
         y_pred_bin = (y_score-np.array(best_threshold) >0)*1
         test_df["predicted"]= list(y_pred_bin)#(all,[length])
@@ -121,29 +123,68 @@ def evaluate(y_test,y_pred_bin):
     recall_score_res=recall_score(y_test, y_pred_bin, average='micro')
     #precision: tp / (tp + fp)
     precision_score_res=precision_score(y_test, y_pred_bin, average='micro',zero_division=0)
-    # print("p,r,f1:",precision_score_res,recall_score_res,f1_score_res)
+    print("p,r,f1:",precision_score_res,recall_score_res,f1_score_res)
     return precision_score_res,recall_score_res,f1_score_res
 
-def run_val(test_loader, test_df, app_name, model_save_path, option, gpu_id):
+def run_val(test_loader, train_loader, df_test, app_name, model_save_path, option, gpu_id):
     global model
     global device
-
+    
     with open("params.yaml", "r") as p:
         params = yaml.safe_load(p)
+    
+    n_samples = params["threshold"]["samples"]
+    res_dir = params["system"]["res"]
     
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
     model = select_model(option)
 
     res = {}
 
-    # print("Validation start")
-    test_df = model_prediction(test_loader, test_df, model_save_path)
-    df_res, threshold=threshold_throttleing(test_df,throttle_type="f1",optimal_type="micro")
-    p,r,f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
-    res["app"], res["opt_th"], res["p"], res["r"], res["f1"]=[app_name],[threshold],[p],[r],[f1]
-
-    df_res, _ =threshold_throttleing(test_df,throttle_type="fixed_threshold",threshold=0.5)
-    p,r,f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
-    res["p_5"], res["r_5"], res["f1_5"] = [p], [r], [f1]
+    print("Validation start")
     
-    return res
+    sampled_threshold = find_optimal_threshold(model, device, train_loader, model_save_path, n_samples)
+    test_df = model_prediction(test_loader, df_test, model_save_path)
+
+    df_res, threshold = threshold_throttleing(test_df, throttle_type="fixed_threshold", threshold=sampled_threshold)
+    sample_p, sample_r, sample_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
+    
+    df_res, threshold = threshold_throttleing(test_df, throttle_type="f1", optimal_type="micro")
+    microf1_p, microf1_r, microf1_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
+    
+    df_res, _ = threshold_throttleing(test_df, throttle_type="fixed_threshold", threshold=0.5)
+    half_p, half_r, half_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
+    
+    res_save_path = replace_directory(model_save_path, res_dir)
+
+    report = {
+        "model": option,
+        "app": app_name,
+        "validation": [ 
+            {
+                "method":"sampled train data",
+                "threshold": float(sampled_threshold),
+                "p": float(sample_p),
+                "r": float(sample_r),
+                "f1": float(sample_f1)
+            },
+            {
+                "method":"micro precision f1",
+                "threshold": float(threshold),
+                "p": float(microf1_p),
+                "r": float(microf1_r),
+                "f1": float(microf1_f1)
+            },
+            {
+                "method":"fixed threshold 0.5",
+                "threshold": 0.5,
+                "p": float(half_p),
+                "r": float(half_r),
+                "f1": float(half_f1) 
+            }
+        ]
+    }
+
+    pprint.pprint(report,sort_dicts=False)
+    with open(res_save_path+'.val_res.json', 'w') as json_file:
+        json.dump(report, json_file,indent=2)
