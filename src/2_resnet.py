@@ -96,10 +96,12 @@ res_dir = params["system"]["res"]
 
 app = sys.argv[1]
 option = sys.argv[2]
-gpu_id = sys.argv[3]
 
-K_CLUSTER = [int(c) for c in sys.argv[4].split(",")]
-N_SUBSPACE = [int(d) for d in sys.argv[5].split(",")]
+K_CLUSTER = [int(c) for c in sys.argv[3].split(",")]
+N_SUBSPACE = [int(d) for d in sys.argv[4].split(",")]
+
+gpu_id = sys.argv[5]
+
 
 model = select_model(option.split(".")[0])
 model_save_path = os.path.join(model_dir, f"{app[:-7]}.{option}.pkl") 
