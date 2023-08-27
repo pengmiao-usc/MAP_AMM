@@ -17,12 +17,11 @@ def threshold_throttleing(train_df, throttle_type="f1", optimal_type="micro", to
     y_real_torch = train_df['future']
     y_real = [tensor.cpu() for tensor in y_real_torch]
     y_score = train_df["y_score"]
-
     if len(y_real[-1]) != 256:
-        amt_to_cut_in_df = len(y_real[-1])*256
-        y_real = y_real.pop()
-        y_score = y_score[:-1*amt_to_cut_in_df]
-
+        y_real = y_real[:-1]
+        y_score = y_score[:-1*(len(y_score)-256*len(y_real))]
+    
+    # WANT
     y_real = np.stack(y_real) 
     y_score = np.stack(y_score)
     
@@ -62,6 +61,7 @@ def find_optimal_threshold(model, device, train_loader, model_save_path, n_sampl
     new_sampled_df = {}
     new_sampled_df["future"] = all_targets
     new_sampled_df["y_score"] = prediction
+    
     _, th = threshold_throttleing(new_sampled_df, throttle_type="f1", optimal_type="micro")
     return th
 
@@ -101,5 +101,5 @@ init_dataloader('0')
 train_loader, test_loader, df_train, df_test = data_generator('/data/pengmiao/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz', 2, 3, 1)
 model = select_model('ms')
 device = torch.device('cuda:0')
-print("threshold", find_optimal_threshold(model, device, train_loader, './model/410.bwaves-s0.ms.pkl', 100))
+print("threshold", find_optimal_threshold(model, device, train_loader, './model/410.bwaves-s0.ms.pkl', 10))
 '''

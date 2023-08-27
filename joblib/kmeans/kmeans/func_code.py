@@ -1,7 +1,7 @@
 # first line: 9
 @_memory.cache
 #def kmeans(X, k, max_iter=16, init='kmc2', return_sse=False):
-def kmeans(X, k, max_iter=16, init='subspaces', return_sse=False):
+def kmeans(X, k, max_iter=1, init='subspaces', return_sse=False):
     X = X.astype(np.float32)
 
     # handle fewer nonzero rows than centroids (mostly just don't choke
