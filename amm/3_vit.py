@@ -18,20 +18,37 @@ from r import resnet_tiny
 from pq_amm_cnn import PQ_AMM_CNN
 from metrics import _cossim
 from r_amm import ResNet_Tiny_Manual
+from v import TMAP
+from v_amm import ViT_Manual
 
 ##
 import math
 
 ##
-model = resnet_tiny(cf.num_classes,cf.channels)
+model = TMAP(
+    image_size=cf.image_size,
+    patch_size=cf.patch_size,
+    num_classes=cf.num_classes,
+    dim=cf.dim,
+    depth=cf.depth,
+    heads=cf.heads,
+    mlp_dim=cf.mlp_dim,
+    channels=cf.channels,
+    dim_head=cf.mlp_dim
+)
+
 summary(model)
 total_params = sum(p.numel() for p in model.parameters())
 #N_SUBSPACE=[2]*5
-N_SUBSPACE=[3,4,8,16,16]
-K_CLUSTER=[32]*5
+#N_SUBSPACE=list(range(1,20))
+#K_CLUSTER=list(range(1,20))
+N_SUBSPACE=[2]*14
+K_CLUSTER=[256]*14
 
-N_Train, N_Test = 2000,1000 # -1 if using all data
-
+N_SUBSPACE_C,K_CLUSTER_C=N_SUBSPACE[:],K_CLUSTER[:]
+# total 14 tables
+N_Train, N_Test = -1,-1 # -1 if using all data
+#N_Train, N_Test = -1,-1
 ##
 def evaluate(y_test,y_pred_bin):
     f1_score_res=f1_score(y_test, y_pred_bin, average='micro')
@@ -47,7 +64,6 @@ def evaluate_by_score(y_score, threshold, y_label):
     p, r, f1 = evaluate(y_label, y_pred_bin)
     return [p, r, f1]
 
-
 def lut_info_summary(est_list):
     lut_shape_ls=[]
     lut_n = len(est_list)
@@ -62,7 +78,7 @@ def layer_cossim(layer_exact, layer_amm):
     n = len(layer_exact)
     for i in range(n):
         res.append(_cossim(layer_exact[i], layer_amm[i]))
-    return res
+    return [float(x) for x in res]
 
 def load_data_n_model(model_save_path):
     tensor_dict_path = model_save_path + '.tensor_dict.pkl'
@@ -85,31 +101,35 @@ def load_data_n_model(model_save_path):
 ##
 # load model and data
 
-#model_save_path = "../dataset/resnet_demo/654.roms/resnet_demo.pkl"
-model_save_path = "./dataset/resnet_demo/410.bwaves/resnet_demo.pkl"
+#model_save_path = "../dataset/vit_demo/654.roms/vit_demo.pkl"
+model_save_path = "../dataset/vit_demo/410.bwaves/vit_demo.pkl"
 
 train_data, train_target, test_data, test_target, model_state_dict, best_threshold = load_data_n_model(model_save_path)
 train_data, train_target, test_data, test_target = train_data[:N_Train], train_target[:N_Train], test_data[:N_Test], test_target[:N_Test]
+
 
 ##
 # check correctness of manual implementation
 y_score_by_whole_train = model(train_data).detach().numpy()
 y_score_by_whole_test = model(test_data).detach().numpy()
 
-resnet_manual_amm = ResNet_Tiny_Manual(model,N_SUBSPACE,K_CLUSTER)
-layer_exact_res_train, mm_exact_res_train = resnet_manual_amm.forward_exact_bn_fold(train_data)
-layer_exact_res_test, mm_exact_res_test  = resnet_manual_amm.forward_exact_bn_fold(test_data)
+
+vit_manual_amm = ViT_Manual(model, N_SUBSPACE, K_CLUSTER)
+
+layer_exact_res_train, mm_exact_res_train = vit_manual_amm.forward_exact(train_data)
+layer_exact_res_test, mm_exact_res_test = vit_manual_amm.forward_exact(test_data)
 print("Manual and Torch results are equal (Train):", np.allclose(y_score_by_whole_train, layer_exact_res_train[-1], atol=1e-5))
 print("Manual and Torch results are equal (Test):", np.allclose(y_score_by_whole_test, layer_exact_res_test[-1], atol=1e-5))
 
-##
-# train amm and eval amm
 
-layer_amm_res_train, mm_amm_res_train = resnet_manual_amm.train_amm(train_data)
+layer_amm_res_train, mm_amm_res_train = vit_manual_amm.train_amm(train_data)
 print("Cosine similarity between AMM and exact (Train):", _cossim(y_score_by_whole_train, layer_amm_res_train[-1]))
 
-layer_amm_res_test, mm_amm_res_test  = resnet_manual_amm.eval_amm(test_data)
+layer_amm_res_test, mm_amm_res_test  = vit_manual_amm.eval_amm(test_data)
 print("Cosine similarity between AMM and exact (Test):", _cossim(y_score_by_whole_test, layer_amm_res_test[-1]))
+
+
+##
 
 cossim_layer_train = layer_cossim(layer_exact_res_train, layer_amm_res_train)
 cossim_layer_test = layer_cossim(layer_exact_res_test, layer_amm_res_test)
@@ -120,21 +140,24 @@ cossim_mm_test = layer_cossim(mm_exact_res_test, mm_amm_res_test)
 f1_exact_ts = evaluate_by_score(y_score_by_whole_test, best_threshold, test_target)
 f1_est_ts = evaluate_by_score(layer_amm_res_test[-1], best_threshold, test_target)
 
+print("done")
 ##
+
+
 # output report
-lut_num, lut_shape_list, lut_total_size = lut_info_summary(resnet_manual_amm.amm_estimators)
+lut_num, lut_shape_list, lut_total_size = lut_info_summary(vit_manual_amm.amm_estimators)
 report = {
     'model': {
-        'name': 'ResNet-tiny',
-        'layer': 8,
+        'name': 'ViT',
+        'layer': len(cossim_layer_train),
         'dim': cf.dim,
         'f1': f1_exact_ts,
         'num_param': total_params
     },
     'estimator': {
         'method': 'PQ_KMEANS',
-        'N_SUBSPACE': N_SUBSPACE,
-        'K_CLUSTER': K_CLUSTER,
+        'N_SUBSPACE': N_SUBSPACE_C,
+        'K_CLUSTER': K_CLUSTER_C,
         'cossim_layer_train': cossim_layer_train,
         'cossim_layer_test': cossim_layer_test,
         'cossim_amm_train': cossim_mm_train,
@@ -149,5 +172,4 @@ report = {
 pprint.pprint(report,sort_dicts=False)
 with open(model_save_path+'.estimator_report.json', 'w') as json_file:
     json.dump(report, json_file,indent=2)
-
 

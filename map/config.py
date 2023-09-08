@@ -7,7 +7,7 @@ PAGE_BITS=12#12
 TOTAL_BITS=64
 BLOCK_NUM_BITS=TOTAL_BITS-BLOCK_BITS
 
-#%% Input and labeling; 
+#%% Input and labeling;
 #%%%tunable
 SPLIT_BITS=6
 LOOK_BACK=9
@@ -45,13 +45,13 @@ mlp_dim=8
 channels=1
 context_gamma=0.2
 '''
-
-dim=64
-depth=6
-heads=16
+dim=16
+depth=2
+heads=2
 mlp_dim=16
 channels=1
 context_gamma=0.2
+#%% Model Definition
 
 #%%% training
 batch_size=256
@@ -101,5 +101,3 @@ class Logger(object):
             stream_handler = logging.StreamHandler()
             stream_handler.setFormatter(logging.Formatter('%(message)s'))
             self.logger.addHandler(stream_handler)
-
-    

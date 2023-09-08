@@ -33,6 +33,8 @@ from numpy import sqrt
 from numpy import argmax
 from threshold_throttling import threshold_throttleing
 from r import resnet_tiny,resnet14
+from v import TMAP
+
 device=cf.device
 batch_size=cf.batch_size
 epochs = cf.epochs
@@ -56,8 +58,18 @@ FILTER_SIZE=cf.FILTER_SIZE
 #             num_classes = cf.num_classes
 #             )
 
-model = resnet_tiny(cf.num_classes,cf.channels).to(device)
-
+#model = resnet_tiny(cf.num_classes,cf.channels).to(device)
+model = TMAP(
+    image_size=cf.image_size,
+    patch_size=cf.patch_size,
+    num_classes=cf.num_classes,
+    dim=cf.dim,
+    depth=cf.depth,
+    heads=cf.heads,
+    mlp_dim=cf.mlp_dim,
+    channels=cf.channels,
+    dim_head=cf.mlp_dim
+)
 #%%
 
 def model_prediction(test_loader, test_df, model_save_path):#"top_k";"degree";"optimal"

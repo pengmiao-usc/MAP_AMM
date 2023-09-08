@@ -90,7 +90,6 @@ def ensure_num_cols_multiple_of(X, multiple_of):
 # ------------------------------------------------ Abstract Base Class
 
 class MultiCodebookEncoder(abc.ABC):
-    #mark:ncentroids=256
     def __init__(self, ncodebooks, ncentroids=16,
                  quantize_lut=False, upcast_every=-1, accumulate_how='sum'):
         self.ncodebooks = ncodebooks
