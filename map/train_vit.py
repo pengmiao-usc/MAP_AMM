@@ -49,10 +49,7 @@ early_stop = cf.early_stop
 
 from mlp_simple import MLP
 
-# model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)*cf.channels),
-#             hidden_size = cf.dim,
-#             num_classes = cf.num_classes
-#             )
+
 model = TMAP(
     image_size=cf.image_size,
     patch_size=cf.patch_size,
@@ -179,12 +176,11 @@ def save_data_for_amm(model_save_path):
 ##########################################################################################################
 
 
-#file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/654.roms-s0.txt.xz"
-file_path = "/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
+file_path="../sample_trace/654.roms-s0.txt.xz"
 
-# res_root = "../dataset/mlp_demo/410.bwaves/"
-#res_root = "../dataset/vit_demo/654.roms/"
-res_root = "../dataset/vit_demo/410.bwaves/"
+
+res_root = "../dataset/vit_demo/654.roms/"
+
 
 if not os.path.exists(res_root):
     os.makedirs(res_root)
