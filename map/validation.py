@@ -52,6 +52,7 @@ BITMAP_SIZE=cf.BITMAP_SIZE
 DELTA_BOUND=cf.DELTA_BOUND
 SPLIT_BITS=cf.SPLIT_BITS
 FILTER_SIZE=cf.FILTER_SIZE
+from m import MLPMixer
 
 # model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)),
 #             hidden_size = cf.dim,
@@ -59,17 +60,24 @@ FILTER_SIZE=cf.FILTER_SIZE
 #             )
 
 #model = resnet_tiny(cf.num_classes,cf.channels).to(device)
-model = TMAP(
-    image_size=cf.image_size,
-    patch_size=cf.patch_size,
-    num_classes=cf.num_classes,
-    dim=cf.dim,
-    depth=cf.depth,
-    heads=cf.heads,
-    mlp_dim=cf.mlp_dim,
-    channels=cf.channels,
-    dim_head=cf.mlp_dim
-)
+# model = TMAP(
+#     image_size=cf.image_size,
+#     patch_size=cf.patch_size,
+#     num_classes=cf.num_classes,
+#     dim=cf.dim,
+#     depth=cf.depth,
+#     heads=cf.heads,
+#     mlp_dim=cf.mlp_dim,
+#     channels=cf.channels,
+#     dim_head=cf.mlp_dim
+# )
+
+
+dim=16
+depth=5
+
+model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=cf.patch_size[1], num_classes=cf.num_classes,
+                 dim=dim, depth=depth, token_dim=dim, channel_dim=dim)
 #%%
 
 def model_prediction(test_loader, test_df, model_save_path):#"top_k";"degree";"optimal"

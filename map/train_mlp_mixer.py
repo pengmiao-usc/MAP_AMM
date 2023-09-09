@@ -31,6 +31,7 @@ import pickle
 from torchinfo import summary
 from r import resnet_tiny, resnet14
 from v import TMAP
+from m import MLPMixer
 
 torch.manual_seed(100)
 
@@ -53,17 +54,12 @@ from mlp_simple import MLP
 #             hidden_size = cf.dim,
 #             num_classes = cf.num_classes
 #             )
-model = TMAP(
-    image_size=cf.image_size,
-    patch_size=cf.patch_size,
-    num_classes=cf.num_classes,
-    dim=cf.dim,
-    depth=cf.depth,
-    heads=cf.heads,
-    mlp_dim=cf.mlp_dim,
-    channels=cf.channels,
-    dim_head=cf.mlp_dim
-).to(device)
+
+dim=16
+depth=5
+
+model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=cf.patch_size[1], num_classes=cf.num_classes,
+                 dim=dim, depth=depth, token_dim=dim, channel_dim=dim)
 # model = resnet14(cf.num_classes,cf.channels).to(device)
 print(summary(model))
 optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -179,17 +175,17 @@ def save_data_for_amm(model_save_path):
 ##########################################################################################################
 
 
-#file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/654.roms-s0.txt.xz"
-file_path = "/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
+file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/654.roms-s0.txt.xz"
+#file_path = "/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
 
 # res_root = "../dataset/mlp_demo/410.bwaves/"
-#res_root = "../dataset/vit_demo/654.roms/"
-res_root = "../dataset/vit_demo/410.bwaves/"
+res_root = "../dataset/mixer_demo/654.roms/"
+#res_root = "../dataset/mixer_demo/410.bwaves/"
 
 if not os.path.exists(res_root):
     os.makedirs(res_root)
 
-model_save_path = res_root + "vit_demo.pkl"
+model_save_path = res_root + "mixer_demo.pkl"
 
 log_path = model_save_path + ".log"
 SKIP_NUM = 1
