@@ -55,11 +55,15 @@ from mlp_simple import MLP
 #             num_classes = cf.num_classes
 #             )
 
-dim=16
-depth=5
+dim = cf.mlp_mixer_dim
+depth = cf.mlp_mixer_depth
 
-model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=cf.patch_size[1], num_classes=cf.num_classes,
-                 dim=dim, depth=depth, token_dim=dim, channel_dim=dim)
+model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=2, num_classes=cf.num_classes,
+                dim=dim, depth=depth, token_dim=dim, channel_dim=cf.channel_dim)
+
+# model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=10, num_classes=cf.num_classes,
+#                  dim=dim, depth=depth, token_dim=dim, channel_dim=cf.channel_dim)
+
 # model = resnet14(cf.num_classes,cf.channels).to(device)
 print(summary(model))
 optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -175,12 +179,12 @@ def save_data_for_amm(model_save_path):
 ##########################################################################################################
 
 
-file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/654.roms-s0.txt.xz"
-#file_path = "/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
+#file_path="/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/654.roms-s0.txt.xz"
+file_path = "/home/pengmiao/Disk/work/data/ML-DPC-S0/LoadTraces/410.bwaves-s0.txt.xz"
 
-# res_root = "../dataset/mlp_demo/410.bwaves/"
-res_root = "../dataset/mixer_demo/654.roms/"
-#res_root = "../dataset/mixer_demo/410.bwaves/"
+#res_root = "../dataset/mlp_demo/410.bwaves/"
+#res_root = "../dataset/mixer_demo/654.roms/"
+res_root = "../dataset/mixer_demo/410.bwaves/"
 
 if not os.path.exists(res_root):
     os.makedirs(res_root)

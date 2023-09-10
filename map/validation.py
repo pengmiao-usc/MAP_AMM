@@ -1,7 +1,9 @@
-#%% y_train;y_score
+# %% y_train;y_score
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'#'2 in tarim'
+
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # '2 in tarim'
 import warnings
+
 warnings.filterwarnings('ignore')
 import sys
 import torch
@@ -16,50 +18,50 @@ import config as cf
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 import torch.nn.functional as F
-from model import resnet18,resnet14,resnet50,resnet101,resnet152,resnet_tiny
+from model import resnet18, resnet14, resnet50, resnet101, resnet152, resnet_tiny
 from mlp_simple import MLP
 from preprocessing import read_load_trace_data, preprocessing, to_bitmap
-#from torch.autograd import Variable
-from sklearn.metrics import roc_curve,f1_score,recall_score,precision_score,accuracy_score
+# from torch.autograd import Variable
+from sklearn.metrics import roc_curve, f1_score, recall_score, precision_score, accuracy_score
 import lzma
 from tqdm import tqdm
-from data_loader import data_generator,MAPDataset
+from data_loader import data_generator, MAPDataset
 import os
 import pdb
-from torch.utils.data import Dataset,DataLoader
+from torch.utils.data import Dataset, DataLoader
 import config as cf
 from sklearn.metrics import roc_curve, auc
 from numpy import sqrt
 from numpy import argmax
 from threshold_throttling import threshold_throttleing
-from r import resnet_tiny,resnet14
+from r import resnet_tiny, resnet14
 from v import TMAP
+from m import MLPMixer
 
-device=cf.device
-batch_size=cf.batch_size
+device = cf.device
+batch_size = cf.batch_size
 epochs = cf.epochs
 lr = cf.lr
 gamma = cf.gamma
-pred_num=cf.PRED_FORWARD
-BLOCK_BITS=cf.BLOCK_BITS
-TOTAL_BITS=cf.TOTAL_BITS
-LOOK_BACK=cf.LOOK_BACK
-PRED_FORWARD=cf.PRED_FORWARD
+pred_num = cf.PRED_FORWARD
+BLOCK_BITS = cf.BLOCK_BITS
+TOTAL_BITS = cf.TOTAL_BITS
+LOOK_BACK = cf.LOOK_BACK
+PRED_FORWARD = cf.PRED_FORWARD
 
-BLOCK_NUM_BITS=cf.BLOCK_NUM_BITS
-PAGE_BITS=cf.PAGE_BITS
-BITMAP_SIZE=cf.BITMAP_SIZE
-DELTA_BOUND=cf.DELTA_BOUND
-SPLIT_BITS=cf.SPLIT_BITS
-FILTER_SIZE=cf.FILTER_SIZE
-from m import MLPMixer
+BLOCK_NUM_BITS = cf.BLOCK_NUM_BITS
+PAGE_BITS = cf.PAGE_BITS
+BITMAP_SIZE = cf.BITMAP_SIZE
+DELTA_BOUND = cf.DELTA_BOUND
+SPLIT_BITS = cf.SPLIT_BITS
+FILTER_SIZE = cf.FILTER_SIZE
 
 # model = MLP(input_size = torch.prod(torch.tensor(cf.image_size)),
 #             hidden_size = cf.dim,
 #             num_classes = cf.num_classes
 #             )
 
-#model = resnet_tiny(cf.num_classes,cf.channels).to(device)
+# model = resnet_tiny(cf.num_classes,cf.channels).to(device)
 # model = TMAP(
 #     image_size=cf.image_size,
 #     patch_size=cf.patch_size,
@@ -72,122 +74,145 @@ from m import MLPMixer
 #     dim_head=cf.mlp_dim
 # )
 
+#
+# channels = 1
+# dim = 18
+# depth = 8
+#
+# model = MLPMixer(
+#     image_size=cf.image_size,
+#     channels=cf.channels,
+#     patch_size=cf.image_size[1],
+#     dim=dim,
+#     depth=depth,
+#     num_classes=cf.num_classes
+# ).to(device)
 
-dim=16
-depth=5
+dim = cf.mlp_mixer_dim
+depth = cf.mlp_mixer_depth
 
-model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=cf.patch_size[1], num_classes=cf.num_classes,
-                 dim=dim, depth=depth, token_dim=dim, channel_dim=dim)
-#%%
+model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=2, num_classes=cf.num_classes,
+                 dim=dim, depth=depth, token_dim=dim, channel_dim=cf.channel_dim)
 
-def model_prediction(test_loader, test_df, model_save_path):#"top_k";"degree";"optimal"
+# model = MLPMixer(in_channels=1, image_size=cf.image_size[0], patch_size=10, num_classes=cf.num_classes,
+#                  dim=dim, depth=depth, token_dim=dim, channel_dim=cf.channel_dim)
+
+# %%
+
+def model_prediction(test_loader, test_df, model_save_path):  # "top_k";"degree";"optimal"
     print("predicting")
-    prediction=[]
+    prediction = []
     model.load_state_dict(torch.load(model_save_path))
     model.to(device)
     model.eval()
-    y_score=np.array([])
-    for data,_ in tqdm(test_loader):
-        output= model(data)
-        #prediction.extend(output.cpu())
+    y_score = np.array([])
+    for data, _ in tqdm(test_loader):
+        output = model(data)
+        # prediction.extend(output.cpu())
         prediction.extend(output.cpu().detach().numpy())
-    test_df["y_score"]= prediction
+    test_df["y_score"] = prediction
 
-    return test_df[['id', 'cycle', 'addr', 'ip','block_address','future', 'y_score']]
+    return test_df[['id', 'cycle', 'addr', 'ip', 'block_address', 'future', 'y_score']]
 
-def evaluate(y_test,y_pred_bin):
-    f1_score_res=f1_score(y_test, y_pred_bin, average='micro')
-    #recall: tp / (tp + fn)
-    recall_score_res=recall_score(y_test, y_pred_bin, average='micro')
-    #precision: tp / (tp + fp)
-    precision_score_res=precision_score(y_test, y_pred_bin, average='micro',zero_division=0)
-    print("p,r,f1:",precision_score_res,recall_score_res,f1_score_res)
-    return precision_score_res,recall_score_res,f1_score_res
+
+def evaluate(y_test, y_pred_bin):
+    f1_score_res = f1_score(y_test, y_pred_bin, average='micro')
+    # recall: tp / (tp + fn)
+    recall_score_res = recall_score(y_test, y_pred_bin, average='micro')
+    # precision: tp / (tp + fp)
+    precision_score_res = precision_score(y_test, y_pred_bin, average='micro', zero_division=0)
+    print("p,r,f1:", precision_score_res, recall_score_res, f1_score_res)
+    return precision_score_res, recall_score_res, f1_score_res
+
 
 ##########################################################################################################
-#%% New post_processing_delta_bitmap
+# %% New post_processing_delta_bitmap
 
 def convert_hex(pred_block_addr):
-    res=int(pred_block_addr)<<BLOCK_BITS
-    res2=res.to_bytes(((res.bit_length() + 7) // 8),"big").hex().lstrip('0')
+    res = int(pred_block_addr) << BLOCK_BITS
+    res2 = res.to_bytes(((res.bit_length() + 7) // 8), "big").hex().lstrip('0')
     return res2
 
-def add_delta(block_address,pred_index):
-    if pred_index<DELTA_BOUND:
-        pred_delta=pred_index+1
+
+def add_delta(block_address, pred_index):
+    if pred_index < DELTA_BOUND:
+        pred_delta = pred_index + 1
     else:
-        pred_delta=pred_index-BITMAP_SIZE
-        
-    return block_address+pred_delta
+        pred_delta = pred_index - BITMAP_SIZE
+
+    return block_address + pred_delta
 
 
 def post_processing_delta_filter(df):
     print("filtering")
-    pred_array=np.stack(df["predicted"])
-    pred_n_degree=pred_array
-    
-    df["pred_index"]=pred_n_degree.tolist()
-    df=df.explode('pred_index')
-    df=df.dropna()[['id', 'cycle', 'block_address', 'pred_index']]
-    
-    #add delta to block address
+    pred_array = np.stack(df["predicted"])
+    pred_n_degree = pred_array
+
+    df["pred_index"] = pred_n_degree.tolist()
+    df = df.explode('pred_index')
+    df = df.dropna()[['id', 'cycle', 'block_address', 'pred_index']]
+
+    # add delta to block address
     df['pred_block_addr'] = df.apply(lambda x: add_delta(x['block_address'], x['pred_index']), axis=1)
-    
-    #filter
+
+    # filter
     que = []
-    pref_flag=[]
-    dg_counter=0
-    df["id_diff"]=df["id"].diff()
-    
+    pref_flag = []
+    dg_counter = 0
+    df["id_diff"] = df["id"].diff()
+
     for index, row in df.iterrows():
-        if row["id_diff"]!=0:
+        if row["id_diff"] != 0:
             que.append(row["block_address"])
-            dg_counter=0
-        pred=row["pred_block_addr"]
-        if dg_counter<cf.Degree:
+            dg_counter = 0
+        pred = row["pred_block_addr"]
+        if dg_counter < cf.Degree:
             if pred in que:
                 pref_flag.append(0)
             else:
                 que.append(pred)
                 pref_flag.append(1)
-                dg_counter+=1
+                dg_counter += 1
         else:
             pref_flag.append(0)
-        que=que[-FILTER_SIZE:]
-    
-    df["pref_flag"]=pref_flag
-    df=df[df["pref_flag"]==1]
+        que = que[-FILTER_SIZE:]
+
+    df["pref_flag"] = pref_flag
+    df = df[df["pref_flag"] == 1]
     df['pred_hex'] = df.apply(lambda x: convert_hex(x['pred_block_addr']), axis=1)
-    df_res=df[["id","pred_hex"]]
+    df_res = df[["id", "pred_hex"]]
     return df_res
-    
 
-def run_val(test_loader,test_df,file_path,model_save_path):
+
+def run_val(test_loader, test_df, file_path, model_save_path):
     print("Validation start")
-    test_df=model_prediction(test_loader, test_df,model_save_path)
+    test_df = model_prediction(test_loader, test_df, model_save_path)
 
-    df_thresh={}
-    app_name=file_path.split("/")[-1].split("-")[0]
-    val_res_path=model_save_path+".val_res.csv"
-    
-    df_res, threshold=threshold_throttleing(test_df,throttle_type="f1",optimal_type="micro")
-    p,r,f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
-    df_thresh["app"],df_thresh["opt_th"],df_thresh["p"],df_thresh["r"],df_thresh["f1"]=[app_name],[threshold],[p],[r],[f1]
-    
-    df_res, _ =threshold_throttleing(test_df,throttle_type="fixed_threshold",threshold=0.5)
-    p,r,f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
-    df_thresh["p_5"],df_thresh["r_5"],df_thresh["f1_5"]=[p],[r],[f1]
-    
-    pd.DataFrame(df_thresh).to_csv(val_res_path,header=1, index=False, sep=" ") #pd_read=pd.read_csv(val_res_path,header=0,sep=" ")
+    df_thresh = {}
+    app_name = file_path.split("/")[-1].split("-")[0]
+    val_res_path = model_save_path + ".val_res.csv"
+
+    df_res, threshold = threshold_throttleing(test_df, throttle_type="f1", optimal_type="micro")
+    p, r, f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
+    df_thresh["app"], df_thresh["opt_th"], df_thresh["p"], df_thresh["r"], df_thresh["f1"] = [app_name], [threshold], [
+        p], [r], [f1]
+
+    df_res, _ = threshold_throttleing(test_df, throttle_type="fixed_threshold", threshold=0.5)
+    p, r, f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
+    df_thresh["p_5"], df_thresh["r_5"], df_thresh["f1_5"] = [p], [r], [f1]
+
+    pd.DataFrame(df_thresh).to_csv(val_res_path, header=1, index=False,
+                                   sep=" ")  # pd_read=pd.read_csv(val_res_path,header=0,sep=" ")
     print("Done: results saved at:", val_res_path)
     return
 
-#%%
+
+# %%
 if __name__ == "__main__":
-    file_path=sys.argv[1]
-    model_save_path=sys.argv[2]
+    file_path = sys.argv[1]
+    model_save_path = sys.argv[2]
     TRAIN_NUM = int(sys.argv[3])
     TOTAL_NUM = int(sys.argv[4])
     SKIP_NUM = int(sys.argv[5])
-    test_loader, test_df = data_generator(file_path,TRAIN_NUM,TOTAL_NUM,SKIP_NUM,only_val=True)
-    run_val(test_loader,test_df,file_path,model_save_path)
+    test_loader, test_df = data_generator(file_path, TRAIN_NUM, TOTAL_NUM, SKIP_NUM, only_val=True)
+    run_val(test_loader, test_df, file_path, model_save_path)

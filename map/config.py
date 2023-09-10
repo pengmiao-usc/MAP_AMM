@@ -63,6 +63,11 @@ early_stop=5
 gamma = 0.1
 step_size=20
 
+
+mlp_mixer_dim = 16
+mlp_mixer_depth = 3
+channel_dim = 32
+
 gpu_id = '0'
 #device_id = [0, 1]
 device_id = [0]
