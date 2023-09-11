@@ -1,0 +1,34 @@
+#!/bin/bash
+
+GPU_NO=4
+
+OPTION="vit"
+AMM_FILE="3_vit.py"
+
+APPS=("410.bwaves-s0.txt.xz" "602.gcc-s0.txt.xz" "bc-3.txt.xz")
+
+for APP in "${APPS[@]}"; do
+  # Train NN
+  python src/train.py "$APP" $OPTION $GPU_NO
+  
+  python src/generate.py $APP $OPTION $GPU_NO
+
+  for k in 16 32 64 128 256 512 1024 2048; do
+    K_VALUES=$(printf "$k,"%.0s {1..13})$k
+    N_VALUES=$(printf "2,"%.0s {1..13})2
+
+    python src/$AMM_FILE $APP $OPTION $K_VALUES $N_VALUES $GPU_NO
+    python src/generate_amm.py $APP $OPTION $K_VALUES $N_VALUES $GPU_NO  
+  done
+
+  for n in 1 2 4 8; do
+    N_VALUES=$(printf "$n,"%.0s {1..13})$n
+    K_VALUES=$(printf "256,"%.0s {1..13})256
+
+    python src/$AMM_FILE $APP $OPTION $K_VALUES $N_VALUES $GPU_NO
+    python src/generate_amm.py $APP $OPTION $K_VALUES $N_VALUES $GPU_NO 
+  done
+
+done
+
+echo "All tasks completed!"
