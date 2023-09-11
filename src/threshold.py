@@ -13,6 +13,7 @@ from preprocess import read_load_trace_data, preprocessing
 from utils import select_model
 
 batch_size = 256
+sigmoid = nn.Sigmoid()
 
 def threshold_throttleing(train_df, throttle_type="f1", optimal_type="micro", topk=2, threshold=0.5):
     y_real_torch = train_df['future']
@@ -54,7 +55,7 @@ def find_optimal_threshold(model, device, train_loader, model_save_path, n_sampl
     for data, target in tqdm(train_loader):
         if counter > n_samples:
             break
-        output = nn.Sigmoid(model(data))
+        output = sigmoid(model(data))
         all_targets.append(target)
         prediction.extend(output.cpu().detach().numpy())
         counter += 1 

@@ -65,7 +65,6 @@ class MLPMixer(nn.Module):
         self.mlp_head = nn.Sequential(
             nn.Linear(dim, num_classes)
         )
-        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
 

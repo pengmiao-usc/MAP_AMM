@@ -189,7 +189,7 @@ if __name__ == "__main__":
     with open(res_path+".val_res.json") as json_file:
         data = json.load(json_file)
     validation_list = data.get("validation")
-    opt_threshold = validation_list[1].get("threshold")
+    opt_threshold = validation_list[0].get("threshold")
     
     test_df = post_processing_delta_filter(test_df, opt_threshold, filtering=False)
     print('after delta filter\n', test_df.columns)

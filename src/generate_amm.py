@@ -162,7 +162,7 @@ def degree_stats(df,app_name,degree_stats_path):
 #%%
 if __name__ == "__main__":
     if len(sys.argv) != 6:
-        print("Usage: python src/generate_amm.py tracefile model_option K,K,K,K,K N,N,N,N,N gpu_id")
+        print("Usage: python src/generate_amm.py tracefile model_option K,...,K N,...,N gpu_id")
         exit(1)
     
     app = sys.argv[1]
@@ -189,7 +189,7 @@ if __name__ == "__main__":
     with open(res_path+".val_res.json") as json_file:
         data = json.load(json_file)
     validation_list = data.get("validation")
-    opt_threshold = validation_list[1].get("threshold")
+    opt_threshold = validation_list[0].get("threshold")
     
     res_path += ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPACE))+".amm_report.json"
     

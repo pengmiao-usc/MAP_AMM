@@ -7,7 +7,7 @@ import yaml
 ## Potential Issues, Channels value is hardcoded in as 1 since DenseNet teacher model has 1 channel
 with open("params.yaml", "r") as p:
     params = yaml.safe_load(p)
-channels = params["model"]["mm"]["channels"]
+channels = params["model"]["rs"]["channels"]
 image_size = (params["hardware"]["look-back"]+1, params["hardware"]["block-num-bits"]//params["hardware"]["split-bits"]+1)
 ## --
 

@@ -7,7 +7,7 @@ import numpy as np
 from numpy import nanargmax, sqrt
 import pandas as pd
 import torch
-from torch.nn import Sigmoid as sigmoid
+from torch import nn
 from tqdm import tqdm
 from sklearn.metrics import auc, f1_score, precision_score, recall_score, precision_recall_curve, roc_curve
 
@@ -17,6 +17,7 @@ from threshold import find_optimal_threshold
 model = None
 device = None
 BITMAP_SIZE = None
+sigmoid = nn.Sigmoid()
 
 def to_bitmap(n,bitmap_size):
     #l0=np.ones((bitmap_size),dtype = int)
@@ -141,11 +142,11 @@ def run_val(test_loader, train_loader, df_test, app_name, model_save_path, res_p
 
     print("Validation start")
     
-    sampled_threshold = find_optimal_threshold(model, device, train_loader, model_save_path, n_samples)
+    #sampled_threshold = find_optimal_threshold(model, device, train_loader, model_save_path, n_samples)
     test_df = model_prediction(test_loader, df_test, model_save_path)
 
-    df_res, threshold = threshold_throttleing(test_df, throttle_type="fixed_threshold", threshold=sampled_threshold)
-    sample_p, sample_r, sample_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
+    # df_res, threshold = threshold_throttleing(test_df, throttle_type="fixed_threshold", threshold=sampled_threshold)
+    # sample_p, sample_r, sample_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
     
     df_res, threshold = threshold_throttleing(test_df, throttle_type="f1", optimal_type="micro")
     microf1_p, microf1_r, microf1_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
@@ -157,13 +158,13 @@ def run_val(test_loader, train_loader, df_test, app_name, model_save_path, res_p
         "model": option,
         "app": app_name,
         "validation": [ 
-            {
-                "method":"sampled train data",
-                "threshold": float(sampled_threshold),
-                "p": float(sample_p),
-                "r": float(sample_r),
-                "f1": float(sample_f1)
-            },
+            # {
+            #     "method":"sampled train data",
+            #     "threshold": float(sampled_threshold),
+            #     "p": float(sample_p),
+            #     "r": float(sample_r),
+            #     "f1": float(sample_f1)
+            # },
             {
                 "method":"micro precision f1",
                 "threshold": float(threshold),

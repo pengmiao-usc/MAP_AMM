@@ -1,7 +1,6 @@
-# MAP_AMM
-Memory access prediction using table approximate matrix multiplication: MLP, ResNet.
+# TNN-Fetch
+Memory access prediction using table approximated matrix multiplication. 
 
-<<<<<<< HEAD
 ## GPU Mapping
 |nvidia-smi|gpu no.|
 |----------|-------|
@@ -14,31 +13,25 @@ Memory access prediction using table approximate matrix multiplication: MLP, Res
 
 
 ## Models
-- ms or MLP Simple
-- mt or MLP Teacher
-- mm or MLP Mixer
+|Baseline structure|N/K count|
+|------------------|---------|
+|MLP Demo          |3        |
+|ResNet_Tiny       |5        |
+|MLP Mixer         |14       |
+|ViT               |14       |
 
-Change trace dir in `params.yaml`, then:
-1. run `python src/preprocess.py {app} {gpu no.}`
-2. run `python src/train.py {app} {model} {gpu no.}`
-3.  a. run `python src/1_mm.py {app} ms {gpu no.}`
-    b. run `python src/2_mm.py {app} mt {gpu no.}
+## Model Abbreviations
+|option|model   |amm file   |
+|------|--------|-----------|
+|ms    |MLPDemo |1_mlp.py   |
+|rs    |ResNet  |2_resnet.py|
+|vit   |TMAP    |3_vit.py   |
+|mix   |MLPMixer|4_mixer.py |
 
-To use KD, instead of 2 and 3:
-
-2. run `python src/train_kd.py {app} {tch model}/mt {stu model}/ms {gpu no.}`
-3. run `python src/1_mm.py {app} ms.stu {gpu no.}`
- 
-=======
-Change trace dir in train.py, then:
-1. run `train.py` in `map` folder to train a model and ouput dataset
-2. run `2_resnet.py` in `amm` folder to train and evaluate PQ table approximation
-
-Updates:
-
-1. 2_resnet.py: whole file
-2. r_amm.py: a manual and lut implementation of resnet-tiny, as a class
-3. pq_amm_cnn.py: pq class for cnn
-4. vquantizers.py: PQEncoder_CNN class, _fit_pq_lut_cnn function, 
-
->>>>>>> d71d9a71b09c12b6b9380caa7b15ff5d962b8906
+## Workflow
+- Change directories and hyperparameters in `params.yaml`
+- Preprocss trace using `python src/preprocess.py {app}.txt.xz {gpu no.}`
+- Train NN using `python src/train.py {app}.txt.xz {option} {gpu no.}`
+- Generate NN prefetch file using `python src/generate.py {app.txt.xz} {option} {gpu no.}`
+- Train AMM using `python src/{amm file} {app}.txt.xz {corresponding option} K,...,K N,...,N {gpu no.}`
+- Generate AMM prefetch file using `python src/generate_amm.py {app}.txt.xz {option} K,...,K N,...,N {gpu no.}`

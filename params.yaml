@@ -19,8 +19,8 @@ threshold:
   samples: 1000
 
 amm:
-  n_samples_train: 102
-  n_samples_test: 105
+  n_samples_train: -1
+  n_samples_test: -1
 
 trace-data:
   train: 20
@@ -29,10 +29,10 @@ trace-data:
   batch-size: 256
 
 model:
-  mm:
-    channels: 1
-    dim: 2 
-    depth: 2 
+  mix:
+    dim: 16
+    depth: 3
+    channel_dim: 32
   ms:
     input_size: 100
     hidden_size: 16 
@@ -46,7 +46,13 @@ model:
     dim: 4
   rt:
     channels: 1
-    dim: 64 
+    dim: 64
+  vit:
+    dim: 16
+    depth: 2
+    heads: 2
+    mlp_dim: 16
+    channels: 1
 
 simulator:
   degree: 16

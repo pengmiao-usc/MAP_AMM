@@ -152,7 +152,6 @@ class ResNet_tiny(nn.Module):
         self.conv4_x = self._make_layer(block, dim*4, num_block[2], 2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(dim*4 * block.expansion, num_classes)
-        self.sigmoid = nn.Sigmoid()
 
     def _make_layer(self, block, out_channels, num_blocks, stride):
         """make resnet layers(by layer i didnt mean this 'layer' was the
@@ -188,7 +187,7 @@ class ResNet_tiny(nn.Module):
         output = output.view(output.size(0), -1)
         output = self.fc(output)
 
-        return self.sigmoid(output)
+        return output
     
 
 def resnet_tiny(num_classes,num_channel,dim):

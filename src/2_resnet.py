@@ -1,6 +1,5 @@
 import os
 import sys
-
 import yaml
 import vq_amm
 import pandas as pd
@@ -16,10 +15,7 @@ import math
 from sklearn.metrics import f1_score,recall_score,precision_score
 
 from utils import select_model, replace_directory
-from pq_amm_cnn import PQ_AMM_CNN
-from metrics import _cossim
 from r_amm import ResNet_Tiny_Manual
-from models.resnet import resnet_tiny
 
 def evaluate(y_test,y_pred_bin):
     f1_score_res=f1_score(y_test, y_pred_bin, average='micro')
@@ -71,7 +67,7 @@ def load_data_n_model(model_save_path, res_path):
         data = json.load(json_file)
 
     validation_list = data.get("validation")
-    best_threshold = validation_list[1].get("threshold")
+    best_threshold = validation_list[0].get("threshold")
     
     return train_data, train_target, test_data, test_target, model.state_dict(), best_threshold
 
@@ -107,6 +103,7 @@ res_path = replace_directory(model_save_path, res_dir)
 test_df_path = model_save_path + ".test_df.pkl"
 amm_path = model_save_path[:-4] + ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPACE))+".amm_df.pkl"
 
+# load model and data
 train_data, train_target, test_data, test_target, all_params, best_threshold = load_data_n_model(model_save_path, res_path)
 train_data, train_target, test_data, test_target = train_data[:N_Train], train_target[:N_Train], test_data[:N_Test], test_target[:N_Test]
 
@@ -114,8 +111,8 @@ res_path += ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPA
 
 ##
 # check correctness of manual implementation
-device = torch.device('cpu')
-model, train_data, test_data = model.to(device), train_data.to(device), test_data.to(device)
+torch.cuda.empty_cache()
+
 y_score_by_whole_train = model(train_data).detach().numpy()
 y_score_by_whole_test = model(test_data).detach().numpy()
 
