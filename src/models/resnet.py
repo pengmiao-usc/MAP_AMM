@@ -11,8 +11,6 @@
 import torch
 import torch.nn as nn
 
-DIM=4
-
 class BasicBlock(nn.Module):
     """Basic Block for resnet 18 and resnet 34
 
@@ -81,25 +79,24 @@ class BottleNeck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, num_block, num_classes=100,num_channel=3):
+    def __init__(self, block, num_block, num_classes=100, num_channel=3, dim=64):
         super().__init__()
 
-        self.in_channels = DIM
+        self.in_channels = dim 
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(num_channel, DIM, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(DIM),
+            nn.Conv2d(num_channel, dim, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(dim),
             nn.ReLU(inplace=True))
         #we use a different inputsize than the original paper
         #so conv2_x's stride is 1
-        self.conv2_x = self._make_layer(block, DIM, num_block[0], 1)
-        self.conv3_x = self._make_layer(block, DIM*2, num_block[1], 2)
-        self.conv4_x = self._make_layer(block, DIM*4, num_block[2], 2)
-        self.conv5_x = self._make_layer(block, DIM*8, num_block[3], 2)
+        self.conv2_x = self._make_layer(block, dim, num_block[0], 1)
+        self.conv3_x = self._make_layer(block, dim*2, num_block[1], 2)
+        self.conv4_x = self._make_layer(block, dim*4, num_block[2], 2)
+        self.conv5_x = self._make_layer(block, dim*8, num_block[3], 2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(DIM*8 * block.expansion, num_classes)
-        self.sigmoid = nn.Sigmoid()
-
+        self.fc = nn.Linear(dim*8 * block.expansion, num_classes)
+    
     def _make_layer(self, block, out_channels, num_blocks, stride):
         """make resnet layers(by layer i didnt mean this 'layer' was the
         same as a neuron netowork layer, ex. conv layer), one layer may
@@ -135,26 +132,26 @@ class ResNet(nn.Module):
         output = output.view(output.size(0), -1)
         output = self.fc(output)
 
-        return self.sigmoid(output)
+        return output
 
 class ResNet_tiny(nn.Module):
 
-    def __init__(self, block, num_block, num_classes=100,num_channel=3):
+    def __init__(self, block, num_block, num_classes=100, num_channel=3, dim=4):
         super().__init__()
 
-        self.in_channels = DIM
+        self.in_channels = dim 
 
         self.conv1 = nn.Sequential(
-            nn.Conv2d(num_channel, DIM, kernel_size=3, padding=1, bias=False),
-            nn.BatchNorm2d(DIM),
+            nn.Conv2d(num_channel, dim, kernel_size=3, padding=1, bias=False),
+            nn.BatchNorm2d(dim),
             nn.ReLU(inplace=True))
         #we use a different inputsize than the original paper
         #so conv2_x's stride is 1
-        self.conv2_x = self._make_layer(block, DIM, num_block[0], 1)
-        self.conv3_x = self._make_layer(block, DIM*2, num_block[1], 2)
-        self.conv4_x = self._make_layer(block, DIM*4, num_block[2], 2)
+        self.conv2_x = self._make_layer(block, dim, num_block[0], 1)
+        self.conv3_x = self._make_layer(block, dim*2, num_block[1], 2)
+        self.conv4_x = self._make_layer(block, dim*4, num_block[2], 2)
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(DIM*4 * block.expansion, num_classes)
+        self.fc = nn.Linear(dim*4 * block.expansion, num_classes)
         self.sigmoid = nn.Sigmoid()
 
     def _make_layer(self, block, out_channels, num_blocks, stride):
@@ -192,18 +189,17 @@ class ResNet_tiny(nn.Module):
         output = self.fc(output)
 
         return self.sigmoid(output)
+    
 
-
-def resnet_tiny(num_classes,num_channel):
+def resnet_tiny(num_classes,num_channel,dim):
     """ return a ResNet 14 object
     """
-    return ResNet_tiny(BasicBlock, [1, 1, 1],num_classes,num_channel)
+    return ResNet_tiny(BasicBlock, [1, 1, 1],num_classes,num_channel,dim)
 
 def resnet14(num_classes,num_channel):
     """ return a ResNet 14 object
     """
     return ResNet(BasicBlock, [1, 1, 1, 1],num_classes,num_channel)
-
 
 def resnet18(num_classes,num_channel):
     """ return a ResNet 18 object
@@ -215,10 +211,10 @@ def resnet34(num_classes,num_channel):
     """
     return ResNet(BasicBlock, [3, 4, 6, 3],num_classes,num_channel)
 
-def resnet50(num_classes,num_channel):
+def resnet50(num_classes,num_channel,dim):
     """ return a ResNet 50 object
     """
-    return ResNet(BottleNeck, [3, 4, 6, 3],num_classes,num_channel)
+    return ResNet(BottleNeck, [3, 4, 6, 3], num_classes, num_channel, dim)
 
 def resnet101(num_classes,num_channel):
     """ return a ResNet 101 object
@@ -229,6 +225,3 @@ def resnet152(num_classes,num_channel):
     """ return a ResNet 152 object
     """
     return ResNet(BottleNeck, [3, 8, 36, 3],num_classes,num_channel)
-
-
-

@@ -1,7 +1,7 @@
 # first line: 9
 @_memory.cache
 #def kmeans(X, k, max_iter=16, init='kmc2', return_sse=False):
-def kmeans(X, k, max_iter=1, init='subspaces', return_sse=False):
+def kmeans(X, k, max_iter=16, init='subspaces', return_sse=False):
     X = X.astype(np.float32)
 
     # handle fewer nonzero rows than centroids (mostly just don't choke
@@ -35,7 +35,6 @@ def kmeans(X, k, max_iter=1, init='subspaces', return_sse=False):
         _, D = X.shape
         #centroids0, _ = kmeans(X[:, :D//2], sqrt_k, max_iter=1)
         #centroids1, _ = kmeans(X[:, D//2:], sqrt_k, max_iter=1)
-
 
         kmeans1 = KMeans(n_clusters=sqrt_k, random_state=0).fit(X[:, :D//2])
         kmeans2 = KMeans(n_clusters=sqrt_k, random_state=0).fit(X[:, D//2:])

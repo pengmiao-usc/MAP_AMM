@@ -19,6 +19,7 @@ from utils import select_model, replace_directory
 from pq_amm_cnn import PQ_AMM_CNN
 from metrics import _cossim
 from r_amm import ResNet_Tiny_Manual
+from models.resnet import resnet_tiny
 
 def evaluate(y_test,y_pred_bin):
     f1_score_res=f1_score(y_test, y_pred_bin, average='micro')
@@ -33,7 +34,6 @@ def evaluate_by_score(y_score, threshold, y_label):
     y_pred_bin = (y_score - np.array(threshold) > 0) * 1
     p, r, f1 = evaluate(y_label, y_pred_bin)
     return [p, r, f1]
-
 
 def lut_info_summary(est_list):
     lut_shape_ls=[]
@@ -54,32 +54,26 @@ def layer_cossim(layer_exact, layer_amm):
 def load_data_n_model(model_save_path, res_path):
     tensor_dict_path = model_save_path + '.tensor_dict.pkl'
     # Load the dictionary using pickle
-    with open(tensor_dict_path, 'rb') as f:
+    with open(model_save_path+'.tensor_dict.pkl', 'rb') as f:
         tensor_dict = pickle.load(f)
     train_data, train_target, test_data, test_target = \
         tensor_dict['train_data'], tensor_dict['train_target'], tensor_dict['test_data'], tensor_dict['test_target']
 
     # define and load model
     model.load_state_dict(torch.load(model_save_path))
-    all_params = list(model.named_parameters())
-
+    model.eval()
+    # all_params = list(model.named_parameters())
+    #df_res = pd.read_csv(model_save_path+".val_res.csv", header=0, sep=" ")
+    #best_threshold = df_res.opt_th.values[0]
+   
     # load json in res dir. for threshold
     with open(res_path+".val_res.json", "r") as json_file:
         data = json.load(json_file)
-    
-    validation_list = data.get("validation")
-    best_threshold = validation_list[0].get("threshold")
-#    highest_f1 = -1  
-#    best_threshold = None
 
-#    for entry in validation_list:
-#        f1 = entry.get("f1")
-#        threshold = entry.get("threshold")
-#        
-#        if f1 is not None and f1 > highest_f1:
-#            highest_f1 = f1
-#            best_threshold = threshold
-    return train_data, train_target, test_data, test_target, all_params, best_threshold
+    validation_list = data.get("validation")
+    best_threshold = validation_list[1].get("threshold")
+    
+    return train_data, train_target, test_data, test_target, model.state_dict(), best_threshold
 
 ##
 
@@ -94,22 +88,34 @@ with open("params.yaml", "r") as p:
 model_dir = params["system"]["model"]
 res_dir = params["system"]["res"]
 
+N_Train, N_Test = params["amm"]["n_samples_train"], params["amm"]["n_samples_test"]
+
 app = sys.argv[1]
 option = sys.argv[2]
 
 K_CLUSTER = [int(c) for c in sys.argv[3].split(",")]
 N_SUBSPACE = [int(d) for d in sys.argv[4].split(",")]
 
+gpu_id = sys.argv[5]
+device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
+
 model = select_model(option.split(".")[0])
+summary(model)
+total_params = sum(p.numel() for p in model.parameters())
 model_save_path = os.path.join(model_dir, f"{app[:-7]}.{option}.pkl") 
 res_path = replace_directory(model_save_path, res_dir) 
+test_df_path = model_save_path + ".test_df.pkl"
+amm_path = model_save_path[:-4] + ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPACE))+".amm_df.pkl"
 
 train_data, train_target, test_data, test_target, all_params, best_threshold = load_data_n_model(model_save_path, res_path)
+train_data, train_target, test_data, test_target = train_data[:N_Train], train_target[:N_Train], test_data[:N_Test], test_target[:N_Test]
 
 res_path += ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPACE))
 
 ##
 # check correctness of manual implementation
+device = torch.device('cpu')
+model, train_data, test_data = model.to(device), train_data.to(device), test_data.to(device)
 y_score_by_whole_train = model(train_data).detach().numpy()
 y_score_by_whole_test = model(test_data).detach().numpy()
 
@@ -121,7 +127,6 @@ print("Manual and Torch results are equal (Test):", np.allclose(y_score_by_whole
 
 ##
 # train amm and eval amm
-
 layer_amm_res_train, mm_amm_res_train = resnet_manual_amm.train_amm(train_data)
 print("Cosine similarity between AMM and exact (Train):", _cossim(y_score_by_whole_train, layer_amm_res_train[-1]))
 
@@ -137,7 +142,14 @@ cossim_mm_test = layer_cossim(mm_exact_res_test, mm_amm_res_test)
 f1_exact_ts = evaluate_by_score(y_score_by_whole_test, best_threshold, test_target)
 f1_est_ts = evaluate_by_score(layer_amm_res_test[-1], best_threshold, test_target)
 
-total_params = sum(p.numel() for p in model.parameters())
+with open(test_df_path, 'rb') as f:
+    test_df = pickle.load(f)
+
+test_df = test_df[:N_Test]
+test_df['y_score'] = layer_amm_res_test[-1]
+
+with open(amm_path, 'wb') as f:
+    pickle.dump(test_df, f)
 
 ##
 # output report
@@ -146,7 +158,7 @@ report = {
     'model': {
         'name': 'ResNet-tiny',
         'layer': 8,
-        'dim': 4,
+        'dim': params['model']['rs']['dim'],
         'f1': f1_exact_ts,
         'num_param': total_params
     },
@@ -168,5 +180,3 @@ report = {
 pprint.pprint(report, sort_dicts=False)
 with open(res_path+'.amm_report.json', 'w') as json_file:
     json.dump(report, json_file, indent=2)
-
-

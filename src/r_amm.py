@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 import torch.nn as nn
 import torch
@@ -240,9 +241,8 @@ class ResNet_Tiny_Manual():
         layer2 = self.forward_block_exact(layer1, self.layer2_weights, self.layer2_bn_buffers, stride=1)
         layer3 = self.forward_block_exact(layer2, self.layer3_weights, self.layer3_bn_buffers, stride=2)
         layer4 = self.forward_block_exact(layer3, self.layer4_weights, self.layer4_bn_buffers, stride=2)
-
-        output = self.avg_pool(torch.tensor(layer4)).view(input_data.shape[0],
-                                                          -1).detach().numpy()  # torch.Size([3025, 16, 1, 1])
+        output = self.avg_pool(torch.tensor(layer4)).view(input_data.shape[0], 
+                                                            -1).detach().numpy()
         # output = output.view(output.size(0), -1) #torch.Size([3025, 16])
         output = np.dot(output, self.layer_fc_weights[0].transpose()) + self.layer_fc_weights[1]
         self.mm_res.append(output)

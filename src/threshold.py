@@ -5,6 +5,7 @@ import yaml
 from sklearn.metrics import f1_score
 from sklearn.metrics import auc, f1_score, precision_score, recall_score, precision_recall_curve, roc_curve
 import torch
+from torch import nn
 from torch.utils.data import DataLoader
 
 from data_loader import init_dataloader, MAPDataset
@@ -53,7 +54,7 @@ def find_optimal_threshold(model, device, train_loader, model_save_path, n_sampl
     for data, target in tqdm(train_loader):
         if counter > n_samples:
             break
-        output = model(data)
+        output = nn.Sigmoid(model(data))
         all_targets.append(target)
         prediction.extend(output.cpu().detach().numpy())
         counter += 1 

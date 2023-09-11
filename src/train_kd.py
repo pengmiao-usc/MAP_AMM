@@ -14,7 +14,7 @@ from torch.optim.lr_scheduler import StepLR
 from torchinfo import summary
 
 from data_loader import init_dataloader
-from utils import select_model 
+from utils import replace_directory, select_model 
 from validate import run_val
 
 torch.manual_seed(100)
@@ -65,7 +65,7 @@ def test(test_loader):
     correct = 0
     with torch.no_grad():
         for data, target in test_loader:
-            output = model(data)
+            output = sigmoid(model(data))
             test_loss += F.binary_cross_entropy(output, target, reduction='mean').item()
             thresh=0.5
             output_bin=(output>=thresh)*1
@@ -173,8 +173,8 @@ def main():
     step_size = params["train"]["step-size"]
     early_stop = params["train"]["early-stop"]
 
-    alpha = params["kd"]["alpha"]
-    Temperature = params["kd"]["temperature"]
+    alpha = float(sys.argv[5]) 
+    Temperature = float(sys.argv[6]) 
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
 
     os.makedirs(os.path.join(model_dir), exist_ok=True)
@@ -182,12 +182,13 @@ def main():
     teacher_model = select_model(t_option)
     model = select_model(option)
     print(summary(model))
-    model_save_path = os.path.join(model_dir, f"{app_name}.{option}.stu.pkl")
+    
+    model_save_path = os.path.join(model_dir, f"{app_name}.{option}.stu.a.{int(alpha*100)}.t.{int(Temperature)}.pkl")
+    res_path = replace_directory(model_save_path, results_dir) 
 
     print("Loading data for model")
     
     test_df = torch.load(os.path.join(processed_dir, f"{app_name}.df.pt"))
-            
     train_loader = torch.load(os.path.join(processed_dir, f"{app_name}.train.pt"))
     test_loader = torch.load(os.path.join(processed_dir, f"{app_name}.test.pt"))
 
@@ -201,8 +202,8 @@ def main():
     loading = False
 
     run_epoch(epochs, early_stop, alpha, loading, model_save_path, train_loader, test_loader, teacher_model, gpu_id)
-    run_val(test_loader, train_loader, test_df, app, model_save_path, option, gpu_id)
-    save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
+    run_val(test_loader, train_loader, test_df, app, model_save_path, res_path, option, gpu_id)
+    #save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
 
 if __name__ == "__main__":
     main()

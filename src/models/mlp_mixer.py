@@ -1,56 +1,83 @@
 import torch
+import numpy as np
 from torch import nn
-from torch.nn import functional as F
-from einops.layers.torch import Rearrange, Reduce
+from einops.layers.torch import Rearrange
 
-class PreNormResidual(nn.Module):
-    def __init__(self, dim, fn):
+
+class FeedForward(nn.Module):
+    def __init__(self, dim, hidden_dim, dropout = 0.):
         super().__init__()
-        self.fn = fn
-        self.norm = nn.LayerNorm(dim)
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+class MixerBlock(nn.Module):
+
+    def __init__(self, dim, num_patch, token_dim, channel_dim, dropout = 0.):
+        super().__init__()
+
+        self.token_mix = nn.Sequential(
+            nn.LayerNorm(dim),
+            Rearrange('b n d -> b d n'),
+            FeedForward(num_patch, token_dim, dropout),
+            Rearrange('b d n -> b n d')
+        )
+
+        self.channel_mix = nn.Sequential(
+            nn.LayerNorm(dim),
+            FeedForward(dim, channel_dim, dropout),
+        )
 
     def forward(self, x):
-        return self.fn(self.norm(x)) + x
 
-def FeedForward(dim, expansion_factor=4, dropout=0.):
-    inner_dim = int(dim * expansion_factor)
-    return nn.Sequential(
-        nn.Linear(dim, inner_dim),
-        nn.GELU(),
-        nn.Dropout(dropout),
-        nn.Linear(inner_dim, dim),
-        nn.Dropout(dropout)
-    )
+        x = x + self.token_mix(x)
+
+        x = x + self.channel_mix(x)
+
+        return x
+
 
 class MLPMixer(nn.Module):
-    def __init__(self, image_size, channels, patch_size, dim, depth, num_classes, expansion_factor=4, expansion_factor_token=0.5, dropout=0.):
-        super().__init__()
-        self.patch_size = patch_size
-        image_h, image_w = image_size
-        assert (image_h % patch_size) == 0 and (image_w % patch_size) == 0, 'image must be divisible by patch size'
-        num_patches = (image_h // patch_size) * (image_w // patch_size)
 
-        self.patch_embedding = nn.Linear(channels * patch_size ** 2, dim)
-        self.mix_layers = nn.ModuleList([
-            nn.Sequential(
-                PreNormResidual(dim, FeedForward(dim, expansion_factor, dropout)),
-                PreNormResidual(dim, FeedForward(dim, expansion_factor_token, dropout))
-            ) for _ in range(depth)
-        ])
+    def __init__(self, in_channels, dim, num_classes, patch_size, image_size, depth, token_dim, channel_dim):
+        super().__init__()
+
+        assert image_size % patch_size == 0, 'Image dimensions must be divisible by the patch size.'
+        self.num_patch = (image_size // patch_size) ** 2
+        self.to_patch_embedding = nn.Sequential(
+            nn.Conv2d(in_channels, dim, patch_size, patch_size),
+            Rearrange('b c h w -> b (h w) c'),
+        )
+
+        self.mixer_blocks = nn.ModuleList([])
+
+        for _ in range(depth):
+            self.mixer_blocks.append(MixerBlock(dim, self.num_patch, token_dim, channel_dim))
+
         self.layer_norm = nn.LayerNorm(dim)
-        self.mlp_head = nn.Linear(dim, num_classes)
+
+        self.mlp_head = nn.Sequential(
+            nn.Linear(dim, num_classes)
+        )
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        x = Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=self.patch_size, p2=self.patch_size)(x)
-        x = self.patch_embedding(x)
 
-        for mix_layer in self.mix_layers:
-            x = mix_layer(x)
+        x = self.to_patch_embedding(x)
+
+        for mixer_block in self.mixer_blocks:
+            x = mixer_block(x)
 
         x = self.layer_norm(x)
-        x = Reduce('b n c -> b c', 'mean')(x)
-        x = self.mlp_head(x)
-        
-        return self.sigmoid(x)
 
+        x = x.mean(dim=1)
+
+        x = self.mlp_head(x)
+
+        return x

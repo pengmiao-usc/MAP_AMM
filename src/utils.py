@@ -6,7 +6,7 @@ import yaml
 from models.mlp_mixer import MLPMixer
 from models.mlp_simple import MLP
 from models.mlp_teacher import MLPTeacher
-from models.resnet import resnet_tiny, resnet152 
+from models.resnet import resnet_tiny, resnet50 
 
 def select_model(option):
     with open("params.yaml", "r") as p:
@@ -28,30 +28,32 @@ def select_model(option):
             depth = depth,
             num_classes = num_classes
         )
-    elif option == "ms":
-        input_size = params["model"][f"{option}"]["input_size"]
-        hidden_size = params["model"][f"{option}"]["hidden_size"]
-        num_classes = params["model"][f"{option}"]["num_classes"]
-        return MLP(
-            input_size = input_size,
-            hidden_size = hidden_size,
-            num_classes = num_classes
-        )
-    elif option == "mt":
-        input_size = params["model"][f"{option}"]["input_size"]
-        hidden_size = params["model"][f"{option}"]["hidden_size"]
-        num_classes = params["model"][f"{option}"]["num_classes"]
-        return MLPTeacher(
-            input_size = input_size,
-            hidden_size = hidden_size,
-            num_classes = num_classes
-        )
+    # elif option == "ms":
+    #     input_size = params["model"][f"{option}"]["input_size"]
+    #     hidden_size = params["model"][f"{option}"]["hidden_size"]
+    #     num_classes = params["model"][f"{option}"]["num_classes"]
+    #     return MLP(
+    #         input_size = input_size,
+    #         hidden_size = hidden_size,
+    #         num_classes = num_classes
+    #     )
+    # elif option == "mt":
+    #     input_size = params["model"][f"{option}"]["input_size"]
+    #     hidden_size = params["model"][f"{option}"]["hidden_size"]
+    #     num_classes = params["model"][f"{option}"]["num_classes"]
+    #     return MLPTeacher(
+    #         input_size = input_size,
+    #         hidden_size = hidden_size,
+    #         num_classes = num_classes
+    #     )
     elif option == "rs":
         channels = params["model"][option]["channels"]
-        return resnet_tiny(num_classes, channels) 
+        dim = params["model"][option]["dim"]
+        return resnet_tiny(num_classes, channels, dim) 
     elif option == "rt":
         channels = params["model"][option]["channels"]
-        return resnet152(num_classes, channels) 
+        dim = params["model"][option]["dim"]
+        return resnet50(num_classes, channels, dim) 
 
 
 def replace_directory(path, new_directory):
@@ -59,5 +61,3 @@ def replace_directory(path, new_directory):
     parts[-2] = new_directory
     new_path = '/'.join(parts)
     return new_path
-
-

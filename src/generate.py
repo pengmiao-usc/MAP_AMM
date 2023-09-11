@@ -54,7 +54,9 @@ BITMAP_SIZE = params["hardware"]["bitmap-size"]
 
 Degree = params["simulator"]["degree"]
 
-model = None 
+model = None
+
+sigmoid = nn.Sigmoid()
 
 def data_generator_gen(file_path,TRAIN_NUM,TOTAL_NUM,SKIP_NUM):
     _, eval_data = read_load_trace_data(file_path, TRAIN_NUM,TOTAL_NUM,SKIP_NUM)
@@ -75,7 +77,7 @@ def model_prediction_gen(test_loader, test_df, model_save_path):#"top_k";"degree
     model.eval()
     y_score=np.array([])
     for data in tqdm(test_loader):
-        output = model(data)
+        output = sigmoid(model(data))
         #prediction.extend(output.cpu())
         prediction.extend(output.cpu().detach().numpy())
     test_df["y_score"]= prediction
@@ -181,17 +183,19 @@ if __name__ == "__main__":
 
     print("Generation start")
     test_loader, test_df = data_generator_gen(file_path, TRAIN, TOTAL, SKIP)
+    print('b4 model prediction col0\n', test_df.columns)
     test_df = model_prediction_gen(test_loader, test_df, model_save_path)
-    
+    print('after model prediction col1\n', test_df.columns)
     with open(res_path+".val_res.json") as json_file:
         data = json.load(json_file)
     validation_list = data.get("validation")
-    opt_threshold = validation_list[0].get("threshold")
+    opt_threshold = validation_list[1].get("threshold")
     
     test_df = post_processing_delta_filter(test_df, opt_threshold, filtering=False)
+    print('after delta filter\n', test_df.columns)
     
-    path_to_prefetch_file = res_save_path+".prefetch_file.txt"
+    path_to_prefetch_file = res_path+".prefetch_file.txt"
     test_df[["id", "pred_hex"]].to_csv(path_to_prefetch_file, header=False, index=False, sep=" ")
 
-    degree_stats_path = res_save_path+".degree_stats.csv"
+    degree_stats_path = res_path+".degree_stats.csv"
     degree_stats(test_df[["id"]], app_name, degree_stats_path)

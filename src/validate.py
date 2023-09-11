@@ -7,6 +7,7 @@ import numpy as np
 from numpy import nanargmax, sqrt
 import pandas as pd
 import torch
+from torch.nn import Sigmoid as sigmoid
 from tqdm import tqdm
 from sklearn.metrics import auc, f1_score, precision_score, recall_score, precision_recall_curve, roc_curve
 
@@ -16,8 +17,6 @@ from threshold import find_optimal_threshold
 model = None
 device = None
 BITMAP_SIZE = None
-
-sigmoid = torch.nn.Sigmoid()
 
 def to_bitmap(n,bitmap_size):
     #l0=np.ones((bitmap_size),dtype = int)
@@ -126,7 +125,7 @@ def evaluate(y_test,y_pred_bin):
     print("p,r,f1:",precision_score_res,recall_score_res,f1_score_res)
     return precision_score_res,recall_score_res,f1_score_res
 
-def run_val(test_loader, train_loader, df_test, app_name, model_save_path, option, gpu_id):
+def run_val(test_loader, train_loader, df_test, app_name, model_save_path, res_path, option, gpu_id):
     global model
     global device
     
@@ -134,7 +133,6 @@ def run_val(test_loader, train_loader, df_test, app_name, model_save_path, optio
         params = yaml.safe_load(p)
     
     n_samples = params["threshold"]["samples"]
-    res_dir = params["system"]["res"]
     
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
     model = select_model(option)
@@ -155,8 +153,6 @@ def run_val(test_loader, train_loader, df_test, app_name, model_save_path, optio
     df_res, _ = threshold_throttleing(test_df, throttle_type="fixed_threshold", threshold=0.5)
     half_p, half_r, half_f1 = evaluate(np.stack(df_res["future"]), np.stack(df_res["predicted"]))
     
-    res_save_path = replace_directory(model_save_path, res_dir)
-
     report = {
         "model": option,
         "app": app_name,
@@ -186,5 +182,5 @@ def run_val(test_loader, train_loader, df_test, app_name, model_save_path, optio
     }
 
     pprint.pprint(report,sort_dicts=False)
-    with open(res_save_path+'.val_res.json', 'w') as json_file:
+    with open(res_path+'.val_res.json', 'w') as json_file:
         json.dump(report, json_file,indent=2)

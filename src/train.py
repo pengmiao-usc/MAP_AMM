@@ -7,13 +7,14 @@ import yaml
 warnings.filterwarnings('ignore')
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from torchinfo import summary
 
 from data_loader import init_dataloader
-from utils import select_model 
+from utils import replace_directory, select_model 
 from threshold import find_optimal_threshold
 from validate import run_val
 
@@ -23,6 +24,7 @@ model = None
 optimizer = None
 scheduler = None
 device = None
+sigmoid = nn.Sigmoid()
 #log = config.Logger()
 
 def train(ep, train_loader, model_save_path):
@@ -31,7 +33,7 @@ def train(ep, train_loader, model_save_path):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):#d,t: (torch.Size([64, 1, 784]),64)        
         optimizer.zero_grad()
-        output = model(data)
+        output = sigmoid(model(data))
         loss = F.binary_cross_entropy(output, target, reduction='mean')
         optimizer.zero_grad()
         loss.backward()
@@ -47,7 +49,7 @@ def test(test_loader):
     correct = 0
     with torch.no_grad():
         for data, target in test_loader:
-            output = model(data)
+            output = sigmoid(model(data))
             test_loss += F.binary_cross_entropy(output, target, reduction='mean').item()
             thresh=0.5
             output_bin=(output>=thresh)*1
@@ -145,7 +147,7 @@ def main():
 
     processed_dir = params["system"]["processed"]
     model_dir = params["system"]["model"]
-    results_dir = params["system"]["res"]
+    res_dir = params["system"]["res"]
 
     epochs = params["train"]["epochs"]
     lr = params["train"]["lr"]
@@ -161,13 +163,13 @@ def main():
 
     model = select_model(option)
     print(summary(model))
+   
     model_save_path = os.path.join(model_dir, f"{app_name}.{option}.pkl")
-    tsv_path = os.path.join(results_dir, f"{app_name}.{option}.tsv")
-
+    res_path = replace_directory(model_save_path, res_dir)
+    
     print("Loading data for model")
     
     test_df = torch.load(os.path.join(processed_dir, f"{app_name}.df.pt"))
-            
     train_loader = torch.load(os.path.join(processed_dir, f"{app_name}.train.pt"))
     test_loader = torch.load(os.path.join(processed_dir, f"{app_name}.test.pt"))
 
@@ -178,9 +180,9 @@ def main():
     scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
     loading = False
-
+    
     run_epoch(epochs, early_stop, loading, model_save_path, train_loader, test_loader, gpu_id)
-    run_val(test_loader, train_loader, test_df, app, model_save_path, option, gpu_id)
+    run_val(test_loader, train_loader, test_df, app, model_save_path, res_path, option, gpu_id)
     save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
 
 if __name__ == "__main__":
