@@ -15,22 +15,11 @@ class ViT_Manual():
         self.patch_linear = self.get_param(model.to_patch_embedding[1])
         self.cls_token = model.cls_token
         self.pos_embedding = model.pos_embedding
-        #self.layernorm_1 = self.get_param(model.transformer.layers[0][0].norm)
-        # layer 1
-        self.layernorm_1_attn = model.transformer.layers[0][0].norm
-        self.to_qkv_wight_1 = self.get_param(model.transformer.layers[0][0].fn.to_qkv)[0]
-        self.to_out_wight_1 = self.get_param(model.transformer.layers[0][0].fn.to_out[0])
-        self.layernorm_1_ffn = model.transformer.layers[0][1].norm
-        self.ffn_weight_1 = self.get_param(model.transformer.layers[0][1].fn.net)
 
-        # layer2
-        self.layernorm_2_attn = model.transformer.layers[1][0].norm
-        self.to_qkv_wight_2 = self.get_param(model.transformer.layers[1][0].fn.to_qkv)[0]
-        self.to_out_wight_2 = self.get_param(model.transformer.layers[1][0].fn.to_out[0])
-        self.layernorm_2_ffn = model.transformer.layers[1][1].norm
-        self.ffn_weight_2 = self.get_param(model.transformer.layers[1][1].fn.net)
+        self.transformer = model.transformer.layers
+        self.transformer_depth = len(model.transformer.layers)
 
-        self.layernorm3_mlp_head=model.mlp_head[0]
+        self.layernorm_mlp_head=model.mlp_head[0]
         self.mlp_head_weight = self.get_param(model.mlp_head[1])
 
         self.softmax = nn.Softmax(dim = -1)
@@ -41,6 +30,7 @@ class ViT_Manual():
         self.amm_est_queue=[]
 
         self.mm_res = []
+        self.layer_res = []
 
     def get_param(self, model_layer, param_type="parameters"):
         if param_type == "parameters":
@@ -78,8 +68,7 @@ class ViT_Manual():
             self.amm_estimators.append(est)
         elif mm_type == 'eval_amm':
             est = self.amm_est_queue.pop(0)
-            est.reset_for_new_task() #necessary
-            est.set_B(weight_t)
+            est.reset_enc()
             res = est.predict(vector, weight_t)
             if len(vec_shape) > 2:
                 res = res.reshape(vec_shape[0],vec_shape[1],-1)
@@ -96,7 +85,6 @@ class ViT_Manual():
         if mm_type == 'exact':
             res = np.matmul(mat_1, mat_2)
         elif mm_type == 'train_amm':
-            res = np.matmul(mat_1, mat_2)
             ncodebooks,ncentroids = self.n_subspace.pop(0), self.k_cluster.pop(0)
             est = PQ_AMM_ATTENTION(ncodebooks, ncentroids)
             est.fit(mat_1,mat_2)
@@ -159,7 +147,13 @@ class ViT_Manual():
         x= self.vector_matrix_multiply(x, mlp_weights[0].transpose(),mlp_weights[1],mm_type)
         return x
 
+    def append_layer_res(self, val):
+        if isinstance(val, torch.Tensor):
+            val = val.detach().numpy()
+        self.layer_res.append(val)
+
     def forward(self,input_data, mm_type='exact'):
+        self.layer_res.clear()
         x = self.patch_rearrange(input_data).detach().numpy()
 
         # MM1: to_patch input linear
@@ -169,24 +163,29 @@ class ViT_Manual():
         b, n, d = x.shape
         cls_tokens = repeat(self.cls_token, '() n d -> b n d', b=b)
         x = torch.cat((cls_tokens, x), dim=1)  # torch.Size([647, 11, 16])
+        # Attention input
+        self.append_layer_res(x)
+        x = x + self.pos_embedding[:, :(n + 1)]  # torch.Size([647, 11, 16])
 
-        x_attn_input = x + self.pos_embedding[:, :(n + 1)]  # torch.Size([647, 11, 16])
+        # Attention Layers
+        for i in range(self.transformer_depth):
+            x = self.norm_attention(x, self.transformer[i][0].norm,
+                                    self.get_param(self.transformer[i][0].fn.to_qkv)[0],
+                                    self.get_param(self.transformer[i][0].fn.to_out[0]), mm_type)
+            self.append_layer_res(x)
+            x = self.norm_ffn(x, self.transformer[i][1].norm,
+                              self.get_param(self.transformer[i][1].fn.net),mm_type)
+            self.append_layer_res(x)
 
-        attn_out_1 = self.norm_attention(x_attn_input,self.layernorm_1_attn, self.to_qkv_wight_1, self.to_out_wight_1,mm_type)
-        ffn_out_1 = self.norm_ffn(attn_out_1, self.layernorm_1_ffn, self.ffn_weight_1,mm_type)
+        x = x[:, 0]
+        x = self.norm_mlp_head(x,self.layernorm_mlp_head,self.mlp_head_weight,mm_type)
 
-        attn_out_2 = self.norm_attention(ffn_out_1,self.layernorm_2_attn, self.to_qkv_wight_2, self.to_out_wight_2,mm_type)
-        ffn_out_2 = self.norm_ffn(attn_out_2, self.layernorm_2_ffn, self.ffn_weight_2,mm_type)
-
-        x = ffn_out_2[:, 0] #(647, 16)
-        x = self.norm_mlp_head(x,self.layernorm3_mlp_head,self.mlp_head_weight,mm_type)
-
-        output = self.sigmoid(torch.tensor(x))
-        layer_res = [x_attn_input.detach().numpy(), attn_out_1, ffn_out_1, attn_out_2, ffn_out_2,output.detach().numpy()]
+        x = self.sigmoid(torch.tensor(x))
+        self.append_layer_res(x)
 
         mm_res = self.mm_res.copy()
         self.mm_res.clear()
-        return layer_res, mm_res
+        return self.layer_res[:], mm_res[:]
 
     def forward_exact(self,input_data):
         return self.forward(input_data, mm_type='exact')
@@ -198,8 +197,6 @@ class ViT_Manual():
         return output
 
     def eval_amm(self,input_data):
-        #self.n_subspace = self.n_subspace_backup[:]
-        #self.k_cluster = self.k_cluster_backup[:]
         return self.forward(input_data, mm_type='eval_amm')
 
 

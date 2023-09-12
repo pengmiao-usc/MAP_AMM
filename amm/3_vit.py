@@ -20,7 +20,7 @@ from metrics import _cossim
 from r_amm import ResNet_Tiny_Manual
 from v import TMAP
 from v_amm import ViT_Manual
-
+import time
 ##
 import math
 
@@ -43,12 +43,12 @@ total_params = sum(p.numel() for p in model.parameters())
 #N_SUBSPACE=list(range(1,20))
 #K_CLUSTER=list(range(1,20))
 N_SUBSPACE=[2]*14
-K_CLUSTER=[256]*14
+K_CLUSTER=[16]*14
 
 N_SUBSPACE_C,K_CLUSTER_C=N_SUBSPACE[:],K_CLUSTER[:]
 # total 14 tables
-N_Train, N_Test = -1,-1 # -1 if using all data
-#N_Train, N_Test = -1,-1
+#N_Train, N_Test = -1,-1 # -1 if using all data
+N_Train, N_Test = 5000,10000
 ##
 def evaluate(y_test,y_pred_bin):
     f1_score_res=f1_score(y_test, y_pred_bin, average='micro')
@@ -89,7 +89,7 @@ def load_data_n_model(model_save_path):
         tensor_dict['train_data'], tensor_dict['train_target'], tensor_dict['test_data'], tensor_dict['test_target']
 
     # define and load model
-    model.load_state_dict(torch.load(model_save_path))
+    model.load_state_dict(torch.load(model_save_path, map_location=torch.device('cpu')))
     #all_params = list(model.named_parameters())
     model.eval()
     # load csv for threshold
@@ -117,21 +117,27 @@ y_score_by_whole_test = model(test_data).detach().numpy()
 vit_manual_amm = ViT_Manual(model, N_SUBSPACE, K_CLUSTER)
 
 layer_exact_res_train, mm_exact_res_train = vit_manual_amm.forward_exact(train_data)
-layer_exact_res_test, mm_exact_res_test = vit_manual_amm.forward_exact(test_data)
 print("Manual and Torch results are equal (Train):", np.allclose(y_score_by_whole_train, layer_exact_res_train[-1], atol=1e-5))
+
+layer_exact_res_test, mm_exact_res_test = vit_manual_amm.forward_exact(test_data)
 print("Manual and Torch results are equal (Test):", np.allclose(y_score_by_whole_test, layer_exact_res_test[-1], atol=1e-5))
 
-
+print("start table training...")
 layer_amm_res_train, mm_amm_res_train = vit_manual_amm.train_amm(train_data)
-print("Cosine similarity between AMM and exact (Train):", _cossim(y_score_by_whole_train, layer_amm_res_train[-1]))
+print("start table evaluation...")
 
+start_time = time.time()
 layer_amm_res_test, mm_amm_res_test  = vit_manual_amm.eval_amm(test_data)
+print(f"Elapsed time: { time.time() - start_time} seconds")
+##
+print("Cosine similarity between AMM and exact (Train):", _cossim(y_score_by_whole_train, layer_amm_res_train[-1]))
 print("Cosine similarity between AMM and exact (Test):", _cossim(y_score_by_whole_test, layer_amm_res_test[-1]))
 
 
 ##
 
 cossim_layer_train = layer_cossim(layer_exact_res_train, layer_amm_res_train)
+##
 cossim_layer_test = layer_cossim(layer_exact_res_test, layer_amm_res_test)
 
 cossim_mm_train = layer_cossim(mm_exact_res_train, mm_amm_res_train)

@@ -36,6 +36,9 @@ class VQMatmul(amm.ApproxMatmul, abc.ABC):
         self.A_enc = None
         self.luts = None
 
+    def reset_enc(self): #A_enc: predicted centroid indexes
+        self.A_enc = None
+
     def fit(self, A, B, Y=None):
         _, D = A.shape
         if D < self.ncodebooks:
