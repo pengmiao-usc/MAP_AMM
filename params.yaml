@@ -23,8 +23,8 @@ amm:
   n_samples_test: -1
 
 trace-data:
-  train: 20
-  total: 30 
+  train: 8 
+  total: 10 
   skip: 1 
   batch-size: 256
 

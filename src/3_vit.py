@@ -57,7 +57,7 @@ def load_data_n_model(model_save_path, res_path):
         tensor_dict['train_data'], tensor_dict['train_target'], tensor_dict['test_data'], tensor_dict['test_target']
 
     # define and load model
-    model.load_state_dict(torch.load(model_save_path))
+    model.load_state_dict(torch.load(model_save_path, map_location=torch.device('cpu')))
     model.eval()
     # all_params = list(model.named_parameters())
     #df_res = pd.read_csv(model_save_path+".val_res.csv", header=0, sep=" ")
@@ -93,9 +93,6 @@ K_CLUSTER = [int(c) for c in sys.argv[3].split(",")]
 N_SUBSPACE = [int(d) for d in sys.argv[4].split(",")]
 N_SUBSPACE_C,K_CLUSTER_C=N_SUBSPACE[:],K_CLUSTER[:]
 
-gpu_id = sys.argv[5]
-device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
-
 model = select_model(option.split(".")[0])
 summary(model)
 total_params = sum(p.numel() for p in model.parameters())
@@ -103,6 +100,8 @@ model_save_path = os.path.join(model_dir, f"{app[:-7]}.{option}.pkl")
 res_path = replace_directory(model_save_path, res_dir) 
 test_df_path = model_save_path + ".test_df.pkl"
 amm_path = model_save_path[:-4] + ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPACE))+".amm_df.pkl"
+
+# TODO: SAMPLE N_Train samples from Train data
 
 # load model and data
 train_data, train_target, test_data, test_target, all_params, best_threshold = load_data_n_model(model_save_path, res_path)
@@ -117,17 +116,19 @@ y_score_by_whole_test = model(test_data).detach().numpy()
 
 
 vit_manual_amm = ViT_Manual(model, N_SUBSPACE, K_CLUSTER)
+print("start table training...")
+layer_amm_res_train, mm_amm_res_train = vit_manual_amm.train_amm(train_data)
+print("start table evaluation...")
 
-layer_exact_res_train, mm_exact_res_train = vit_manual_amm.forward_exact(train_data)
-layer_exact_res_test, mm_exact_res_test = vit_manual_amm.forward_exact(test_data)
+start_time = time.time()
+layer_amm_res_test, mm_amm_res_test  = vit_manual_amm.eval_amm(test_data)
+print(f"Elapsed time: { time.time() - start_time} seconds")
+
 print("Manual and Torch results are equal (Train):", np.allclose(y_score_by_whole_train, layer_exact_res_train[-1], atol=1e-5))
 print("Manual and Torch results are equal (Test):", np.allclose(y_score_by_whole_test, layer_exact_res_test[-1], atol=1e-5))
 
 
-layer_amm_res_train, mm_amm_res_train = vit_manual_amm.train_amm(train_data)
 print("Cosine similarity between AMM and exact (Train):", _cossim(y_score_by_whole_train, layer_amm_res_train[-1]))
-
-layer_amm_res_test, mm_amm_res_test  = vit_manual_amm.eval_amm(test_data)
 print("Cosine similarity between AMM and exact (Test):", _cossim(y_score_by_whole_test, layer_amm_res_test[-1]))
 
 
@@ -149,7 +150,8 @@ with open(test_df_path, 'rb') as f:
     test_df = pickle.load(f)
 
 test_df = test_df[:N_Test]
-test_df['y_score'] = layer_amm_res_test[-1]
+test_df['y_score'] = layer_[-1]
+#test_df['y_score'] = layer_amm_res_test[-1]
 
 with open(amm_path, 'wb') as f:
     pickle.dump(test_df, f)

@@ -56,7 +56,7 @@ def load_data_n_model(model_save_path, res_path):
         tensor_dict['train_data'], tensor_dict['train_target'], tensor_dict['test_data'], tensor_dict['test_target']
 
     # define and load model
-    model.load_state_dict(torch.load(model_save_path))
+    model.load_state_dict(torch.load(model_save_path, map_location=torch.device('cpu')))
     model.eval()
     # all_params = list(model.named_parameters())
     #df_res = pd.read_csv(model_save_path+".val_res.csv", header=0, sep=" ")
@@ -92,9 +92,6 @@ option = sys.argv[2]
 K_CLUSTER = [int(c) for c in sys.argv[3].split(",")]
 N_SUBSPACE = [int(d) for d in sys.argv[4].split(",")]
 
-gpu_id = sys.argv[5]
-device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
-
 model = select_model(option.split(".")[0])
 summary(model)
 total_params = sum(p.numel() for p in model.parameters())
@@ -111,8 +108,6 @@ res_path += ".k."+".".join(map(str, K_CLUSTER))+".n."+".".join(map(str, N_SUBSPA
 
 ##
 # check correctness of manual implementation
-torch.cuda.empty_cache()
-
 y_score_by_whole_train = model(train_data).detach().numpy()
 y_score_by_whole_test = model(test_data).detach().numpy()
 
