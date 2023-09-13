@@ -31,6 +31,20 @@ def select_model(option):
             token_dim=dim, 
             channel_dim=channels 
         )
+    elif option == "mixt":
+        dim = params["model"][f"{option}"]["dim"]
+        depth = params["model"][f"{option}"]["depth"]
+        channels = params["model"][f"{option}"]["channel_dim"]
+        return MLPMixer(
+            in_channels=1, 
+            image_size=image_size[0], 
+            patch_size=2, 
+            num_classes=num_classes,
+            dim=dim,
+            depth=depth,
+            token_dim=dim, 
+            channel_dim=channels 
+        )
     elif option == "ms":
         input_size = params["model"][f"{option}"]["input_size"]
         hidden_size = params["model"][f"{option}"]["hidden_size"]
@@ -40,7 +54,7 @@ def select_model(option):
             hidden_size = hidden_size,
             num_classes = num_classes
         )
-    elif option == "mt":
+    elif option == "mst":
         input_size = params["model"][f"{option}"]["input_size"]
         hidden_size = params["model"][f"{option}"]["hidden_size"]
         num_classes = params["model"][f"{option}"]["num_classes"]
@@ -53,11 +67,23 @@ def select_model(option):
         channels = params["model"][option]["channels"]
         dim = params["model"][option]["dim"]
         return resnet_tiny(num_classes, channels, dim) 
-    elif option == "rt":
+    elif option == "rst":
         channels = params["model"][option]["channels"]
         dim = params["model"][option]["dim"]
         return resnet50(num_classes, channels, dim) 
     elif option == "vit":
+        return TMAP (
+            image_size=image_size,
+            patch_size=patch_size,
+            num_classes=num_classes,
+            dim = params["model"][option]["dim"],
+            depth = params["model"][option]["depth"],
+            heads = params["model"][option]["heads"],
+            mlp_dim = params["model"][option]["mlp_dim"],
+            channels = params["model"][option]["channels"],
+            dim_head = params["model"][option]["mlp_dim"]
+        )
+    elif option == "vitt":
         return TMAP (
             image_size=image_size,
             patch_size=patch_size,

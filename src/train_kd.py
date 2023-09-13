@@ -160,7 +160,10 @@ def main():
     t_option = sys.argv[2]
     option = sys.argv[3]
     
-    gpu_id = sys.argv[4]
+    alpha = float(sys.argv[4]) 
+    Temperature = float(sys.argv[5]) 
+    
+    gpu_id = sys.argv[6]
     init_dataloader(gpu_id)
 
     processed_dir = params["system"]["processed"]
@@ -173,8 +176,6 @@ def main():
     step_size = params["train"]["step-size"]
     early_stop = params["train"]["early-stop"]
 
-    alpha = float(sys.argv[5]) 
-    Temperature = float(sys.argv[6]) 
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
 
     os.makedirs(os.path.join(model_dir), exist_ok=True)

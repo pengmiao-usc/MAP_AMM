@@ -33,18 +33,22 @@ model:
     dim: 16
     depth: 3
     channel_dim: 32
+  mixt:
+    dim: 128 
+    depth: 64 
+    channel_dim: 256 
   ms:
     input_size: 100
     hidden_size: 16 
     num_classes: 256
-  mt:
+  mst:
     input_size: 100
     hidden_size: 1024 
     num_classes: 256
   rs:
     channels: 1
     dim: 4
-  rt:
+  rst:
     channels: 1
     dim: 64
   vit:
@@ -52,6 +56,12 @@ model:
     depth: 2
     heads: 2
     mlp_dim: 16
+    channels: 1
+  vitt:
+    dim: 64 
+    depth: 16
+    heads: 16 
+    mlp_dim: 64 
     channels: 1
 
 simulator:
