@@ -5,14 +5,17 @@ from einops import rearrange, repeat
 import config as cf
 import vq_amm
 from pq_amm_attention import PQ_AMM_ATTENTION
+from metrics import _cossim
 from torch import einsum
-
+import torch.optim as optim
+from tqdm import tqdm
 class ViT_Manual():
     def __init__(self, model, N_SUBSPACE, K_CLUSTER):
         self.n_subspace = N_SUBSPACE
         self.k_cluster = K_CLUSTER
         self.patch_rearrange = model.to_patch_embedding[0]
-        self.patch_linear = self.get_param(model.to_patch_embedding[1])
+        #self.patch_linear = self.get_param(model.to_patch_embedding[1])
+        self.patch_linear = model.to_patch_embedding[1]
         self.cls_token = model.cls_token
         self.pos_embedding = model.pos_embedding
 
@@ -32,6 +35,8 @@ class ViT_Manual():
         self.mm_res = []
         self.layer_res = []
 
+        self.fine_tune_target = [] #exact results
+
     def get_param(self, model_layer, param_type="parameters"):
         if param_type == "parameters":
             return [param.detach().numpy() for param in model_layer.parameters()]
@@ -39,6 +44,35 @@ class ViT_Manual():
             return [param.detach().numpy() for param in model_layer.buffers() if param.numel() > 1]
         else:
             raise ValueError("Invalid type in model layer to get parameters")
+
+    #def
+
+    def fine_tune_retrain_weight(self,new_input,weight, bias, target,epoch=300,lr=0.001):
+        linear_layer = nn.Linear(weight.shape[0], weight.shape[1])
+        with torch.no_grad():
+            linear_layer.weight.copy_(weight.t())  # Transpose the weight matrix
+            linear_layer.bias.copy_(bias)
+        #res_2 = linear_layer(torch.tensor(vector))
+        #
+
+        ##
+        criterion= nn.MSELoss()
+        optimizer = optim.Adam(linear_layer.parameters(), lr=lr)
+
+        print("Retrain weight")
+        for i in tqdm(range(epoch)):
+            optimizer.zero_grad()
+            new_output = linear_layer(new_input)  # Compute the new output from layer2_model
+            loss = criterion(new_output, target)
+            loss.backward()
+            optimizer.step()
+            if loss<1e-5:
+                break
+        print(f"Retrain for {i+1} epochs")
+        ##
+        new_weight, new_bias = self.get_param(linear_layer)
+        return new_weight.transpose(), new_bias
+
 
     def vector_matrix_multiply(self, vector, weight_t, bias=0, mm_type='exact'):
         # apply to batches of 1d and 2d vectors times weight matrix
@@ -49,6 +83,15 @@ class ViT_Manual():
         vec_shape = vector.shape
         if len(vec_shape)>2:
             vector = vector.reshape(-1,vec_shape[-1])
+        # process
+
+        if mm_type == 'fine_tune':
+            target = self.fine_tune_target.pop(0)
+            if len(target) > 2:
+                target = target.reshape(-1, target.shape[-1])
+            weight_t, bias = self.fine_tune_retrain_weight(torch.tensor(vector), torch.tensor(weight_t),
+                                                           torch.tensor(bias),torch.tensor(target))
+            mm_type = 'train_amm'
 
         if mm_type == 'exact':
             res = np.dot(vector, weight_t)
@@ -66,6 +109,7 @@ class ViT_Manual():
                 res = res.reshape(vec_shape[0],vec_shape[1],-1)
             res += bias
             self.amm_estimators.append(est)
+
         elif mm_type == 'eval_amm':
             est = self.amm_est_queue.pop(0)
             est.reset_enc()
@@ -82,6 +126,10 @@ class ViT_Manual():
     def matrix_matrix_multiply(self, mat_1, mat_2, mm_type='exact'):
         # apply to multiplication of two batches of 2d matrix
         #(b;x,y)*(b;y,z)=>(b;x,z)
+        if mm_type == 'fine_tune':
+            target = self.fine_tune_target.pop(0)
+            #res = np.matmul(mat_1, mat_2)
+            mm_type = 'train_amm'
         if mm_type == 'exact':
             res = np.matmul(mat_1, mat_2)
         elif mm_type == 'train_amm':
@@ -157,7 +205,9 @@ class ViT_Manual():
         x = self.patch_rearrange(input_data).detach().numpy()
 
         # MM1: to_patch input linear
-        x = self.vector_matrix_multiply(x, self.patch_linear[0].transpose(),self.patch_linear[1], mm_type)
+        #x = self.vector_matrix_multiply(x, self.patch_linear[0].transpose(),self.patch_linear[1], mm_type)
+        patch_weights = self.get_param(self.patch_linear)
+        x = self.vector_matrix_multiply(x, patch_weights[0].transpose(),patch_weights[1], mm_type)
 
         x=torch.tensor(x)
         b, n, d = x.shape
@@ -187,11 +237,15 @@ class ViT_Manual():
         self.mm_res.clear()
         return self.layer_res[:], mm_res[:]
 
+
     def forward_exact(self,input_data):
-        return self.forward(input_data, mm_type='exact')
+        output = self.forward(input_data, mm_type='exact')
+        return output
+
 
 
     def train_amm(self,input_data):
+        self.amm_estimators.clear()
         output = self.forward(input_data, mm_type='train_amm')
         self.amm_est_queue = self.amm_estimators.copy()
         return output
@@ -199,6 +253,11 @@ class ViT_Manual():
     def eval_amm(self,input_data):
         return self.forward(input_data, mm_type='eval_amm')
 
+    def fine_tune(self,input_data,targets):
+        self.fine_tune_target = targets
+        output = self.forward(input_data, mm_type='fine_tune')
+        self.amm_est_queue = self.amm_estimators.copy()
+        return output
 
     def layer_norm_manual(self,x,weight,bias):
         # layernorm is element-wise operation, not dot product(MM)

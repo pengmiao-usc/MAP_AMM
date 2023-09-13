@@ -55,7 +55,7 @@ context_gamma=0.2
 
 #%%% training
 batch_size=256
-epochs=50
+epochs=60
 #200
 lr = 2e-4
 early_stop=5

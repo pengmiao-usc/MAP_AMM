@@ -6,7 +6,6 @@ import torch.nn as nn
 import torch
 import numpy as np
 import pickle
-from metrics import _cossim
 import config as cf
 from torchinfo import summary
 import json
@@ -124,8 +123,10 @@ layer_exact_res_test, mm_exact_res_test = vit_manual_amm.forward_exact(test_data
 #print("Manual and Torch results are equal (Test):", np.allclose(y_score_by_whole_test, layer_exact_res_test[-1], atol=1e-5))
 print("Manual and Torch results cosine similarity (Test):", _cossim(y_score_by_whole_test, layer_exact_res_test[-1]))
 
-print("start table training...")
-layer_amm_res_train, mm_amm_res_train = vit_manual_amm.train_amm(train_data)
+##
+# UPDATE HERE FOR FINE-TUNING!
+print("start table training with fine_tuning...")
+layer_amm_res_train, mm_amm_res_train = vit_manual_amm.fine_tune(train_data,mm_exact_res_train.copy())
 print("start table evaluation...")
 
 start_time = time.time()
@@ -178,6 +179,6 @@ report = {
 }
 
 pprint.pprint(report,sort_dicts=False)
-with open(model_save_path+'.estimator_report64.json', 'w') as json_file:
+with open(model_save_path+'.estimator_report_fine_tune64.json', 'w') as json_file:
     json.dump(report, json_file,indent=2)
 
