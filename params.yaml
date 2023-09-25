@@ -5,26 +5,30 @@ system:
   res: res
 
 train:
-  epochs: 50 
-  lr: 0.0002
+  epochs: 200 
+  lr: 0.000175
   gamma: 0.1
   step-size: 20
   early-stop: 5 
 
 kd:
-  alpha: 0.1 
-  temperature: 2 
+  lr: 0.00004
+  epochs: 200 
+  alpha: 0.6
+  temperature: 1 
+cluster:
+  option: i 
+  number: 2 
 
 threshold:
   samples: 1000
 
 amm:
-  n_samples_train: -1
-  n_samples_test: -1
+  n_samples_train: 10000 
 
 trace-data:
-  train: 8 
-  total: 10 
+  train: 10 
+  total: 15 
   skip: 1 
   batch-size: 256
 
@@ -51,17 +55,17 @@ model:
   rst:
     channels: 1
     dim: 64
-  vit:
-    dim: 16
-    depth: 2
-    heads: 2
-    mlp_dim: 16
-    channels: 1
   vitt:
-    dim: 64 
-    depth: 16
-    heads: 16 
-    mlp_dim: 64 
+    dim: 256 
+    depth: 4 
+    heads: 8 
+    mlp_dim: 256 
+    channels: 1
+  vit:
+    dim: 32 
+    depth: 1 
+    heads: 2 
+    mlp_dim: 32 
     channels: 1
 
 simulator:

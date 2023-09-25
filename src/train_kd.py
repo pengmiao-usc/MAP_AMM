@@ -12,10 +12,13 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 from torchinfo import summary
+from statistics import mean
 
 from data_loader import init_dataloader
-from utils import replace_directory, select_model 
+from utils import select_model, replace_directory 
 from validate import run_val
+
+os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
 
 torch.manual_seed(100)
 
@@ -33,6 +36,8 @@ def train(ep, alpha, train_loader, model_save_path, teacher_model):
     global steps
     epoch_loss = 0
     model.train()
+    print('1', len(train_loader))
+    print('2', len(train_loader.dataset))
     for batch_idx, (data, target) in enumerate(train_loader):#d,t: (torch.Size([64, 1, 784]),64)
         data, target = data.to(device), target.to(device)
         optimizer.zero_grad()
@@ -41,7 +46,7 @@ def train(ep, alpha, train_loader, model_save_path, teacher_model):
         with torch.no_grad():
             teacher_preds = teacher_model(data)
 
-        student_loss = F.binary_cross_entropy(student_preds, target, reduction='mean')
+        student_loss = F.binary_cross_entropy(sigmoid(student_preds), target, reduction='mean')
 
         x_t_sig = sigmoid(teacher_preds / Temperature).reshape(-1)
         x_s_sig = sigmoid(student_preds / Temperature).reshape(-1)
@@ -74,23 +79,34 @@ def test(test_loader):
         test_loss /=  len(test_loader)
         return test_loss   
 
-def run_epoch(epochs, early_stop, alpha, loading, model_save_path, train_loader, test_loader, teacher_model, gpu_id):
+def run_epoch(epochs, early_stop, alpha, loading, model_save_path, train_loaders, test_loaders, teacher_models, teacher_paths):
     if loading==True:
-        model.load_state_dict(torch.load(model_save_path))
+        model.load_state_dict(torch.load(model_save_path,map_location=device))
         print("-------------Model Loaded------------")
         
     best_loss=0
-    early_stop = early_stop
     curr_early_stop = early_stop
-
-    metrics_data = []
+    num_clu = len(test_loaders)
 
     for epoch in range(epochs):
         print(f"------- START EPOCH {epoch+1} -------")
-        train_loss=train(epoch, alpha, train_loader, model_save_path, teacher_model=teacher_model)
-        test_loss=test(test_loader)
-        print((f"Epoch: {epoch+1} - loss: {train_loss:.10f} - test_loss: {test_loss:.10f}"))
-        
+
+        train_losses = []
+        test_losses = []
+
+        logging = f"Epoch {epoch+1:2.0f}: "
+        for i in range(num_clu): 
+            teacher_model = teacher_models[i].to(device)
+            teacher_model.load_state_dict(torch.load(teacher_paths[i], map_location=device))
+            train_loss=train(epoch, alpha, train_loaders[i], model_save_path, teacher_model=teacher_model)
+            test_loss=test(test_loaders[i])
+            logging += f"T{i+1}: TrainL={train_loss:.5f}, TestL={test_loss:.5f}; "
+            train_losses.append(train_loss)
+            test_losses.append(test_loss) 
+
+        print(logging)
+
+        test_loss = mean(test_losses)
         if epoch == 0:
             best_loss=test_loss
         if test_loss<=best_loss:
@@ -160,51 +176,61 @@ def main():
     t_option = sys.argv[2]
     option = sys.argv[3]
     
-    alpha = float(sys.argv[4]) 
-    Temperature = float(sys.argv[5]) 
-    
-    gpu_id = sys.argv[6]
+    gpu_id = sys.argv[4]
     init_dataloader(gpu_id)
 
     processed_dir = params["system"]["processed"]
     model_dir = params["system"]["model"]
     results_dir = params["system"]["res"]
 
-    epochs = params["train"]["epochs"]
-    lr = params["train"]["lr"]
+    epochs = params["kd"]["epochs"]
+    lr = params["kd"]["lr"]
     gamma = params["train"]["gamma"]
     step_size = params["train"]["step-size"]
     early_stop = params["train"]["early-stop"]
 
+    clu_n = params["cluster"]["number"]
+    cluster_option = params["cluster"]["option"]
+
+    alpha = float(sys.argv[5]) 
+    Temperature = params["kd"]["temperature"]
     device = torch.device(f"cuda:{gpu_id}" if torch.cuda.is_available() else "cpu")
 
     os.makedirs(os.path.join(model_dir), exist_ok=True)
 
-    teacher_model = select_model(t_option)
+    teacher_models = [select_model(t_option) for _ in range(clu_n)]
+    teacher_options = [t_option for _ in range(clu_n)]
     model = select_model(option)
     print(summary(model))
-    
-    model_save_path = os.path.join(model_dir, f"{app_name}.{option}.stu.a.{int(alpha*100)}.t.{int(Temperature)}.pkl")
-    res_path = replace_directory(model_save_path, results_dir) 
+    model_save_path = os.path.join(model_dir, cluster_option, f"{app_name}.{option}.stu.{alpha*100}.pkl")
+    res_path = os.path.join(results_dir, cluster_option, f"{app_name}.{option}.stu.{alpha*100}.pkl")
+    teacher_paths = [os.path.join(model_dir, cluster_option, f"{app_name}.teacher_{i+1}.{option}.pth") for i, option in enumerate(teacher_options)]
 
     print("Loading data for model")
     
     test_df = torch.load(os.path.join(processed_dir, f"{app_name}.df.pt"))
     train_loader = torch.load(os.path.join(processed_dir, f"{app_name}.train.pt"))
     test_loader = torch.load(os.path.join(processed_dir, f"{app_name}.test.pt"))
+    train_loaders = []
+    test_loaders = []
 
+    for i, _ in enumerate(teacher_paths, start=1):
+        train_loader = torch.load(os.path.join(processed_dir, cluster_option, f"{app_name}.train_{i}.pt"))
+        test_loader = torch.load(os.path.join(processed_dir, cluster_option, f"{app_name}.test_{i}.pt"))
+        train_loaders.append(train_loader)
+        test_loaders.append(test_loader)
+        
     print("Data loaded successfully for stu")
-    
-    teacher_model = teacher_model.to(device)
+
     model = model.to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
     loading = False
 
-    run_epoch(epochs, early_stop, alpha, loading, model_save_path, train_loader, test_loader, teacher_model, gpu_id)
-    run_val(test_loader, train_loader, test_df, app, model_save_path, res_path, option, gpu_id)
-    #save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
+    run_epoch(epochs, early_stop, alpha, loading, model_save_path, train_loaders, test_loaders, teacher_models, teacher_paths)
+    run_val(test_loader, test_df, app, model_save_path, res_path, option, gpu_id)
+    save_data_for_amm(model_save_path, train_loader, test_loader, test_df)
 
 if __name__ == "__main__":
     main()

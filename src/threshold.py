@@ -9,7 +9,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from data_loader import init_dataloader, MAPDataset
-from preprocess import read_load_trace_data, preprocessing
+from prep_single import read_load_trace_data, preprocessing
 from utils import select_model
 
 batch_size = 256

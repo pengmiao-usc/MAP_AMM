@@ -41,10 +41,10 @@ Memory access prediction using table approximated matrix multiplication.
 - Preprocss trace using `python src/preprocess.py {trace} {gpu no.}`
 - Train NN using `python src/train.py {trace} {option} {gpu no.}` 
 - Generate NN prefetch file using `python src/generate.py {trace} {option} {gpu no.}`
-- Train AMM using `python src/{amm file} {trace} {corresponding option} K,...,K N,...,N {gpu no.}`
+- Train AMM w/o Fine-Tuning `taskset -c {core 0}-{core 63} python src/{amm file} {trace} {corresponding option} K,...,K N,...,N {gpu no.}`
 - Generate AMM prefetch file using `python src/generate_amm.py {trace} {option} K,...,K N,...,N {gpu no.}`
 
 ## KD Workflow
-- Train Teacher Model: `python src/train.py {trace} {option}t {gpu no.}
-- Train Student Model via KD: `python src/train_kd.py {trace} {teacher model} {student model} {alpha 0 - 1} {temperature 1 - 5} {gpu no.}
+- Train Teacher Model: `python src/train.py {trace} {option}t {gpu no.}`
+- Train Student Model via KD: `python src/train_kd.py {trace} {teacher model} {student model} {gpu no.} {alpha 0 - 1} {temperature 1 - 5}` 
 - Find outputs with the names of `{app}.{option}.stu.a.{alpha}.t.{temp}` in `/res` and `/model`

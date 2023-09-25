@@ -13,7 +13,7 @@ import pandas as pd
 import torch.optim as optim
 from torch.optim.lr_scheduler import StepLR
 import torch.nn.functional as F
-from preprocess import read_load_trace_data, preprocessing, to_bitmap,preprocessing_gen
+from prep_single import read_load_trace_data, preprocessing, to_bitmap,preprocessing_gen
 from torch.autograd import Variable
 from sklearn.metrics import roc_curve,f1_score,recall_score,precision_score,accuracy_score
 import lzma

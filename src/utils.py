@@ -102,3 +102,37 @@ def replace_directory(path, new_directory):
     parts[-2] = new_directory
     new_path = '/'.join(parts)
     return new_path
+
+def select_clu(df_train, df_test, option):
+    if option == "p":
+        data_train = df_train['past_page'].values
+        data_train = np.array(data_train.tolist())
+        
+        data_test = df_test['past_page'].values
+        data_test = np.array(data_test.tolist())
+        return data_train, data_test
+
+    if option == "i":
+        data_train = df_train['past_ip'].values
+        data_train = np.array(data_train.tolist())
+
+        data_test = df_test['past_ip'].values
+        data_test = np.array(data_test.tolist())
+        return data_train, data_test
+
+    if option == "d":
+        data_train = df_test['past_delta'].values
+        data_train = np.array(data_train.tolist())
+        
+        data_test = df_test['past_delta'].values
+        data_test = np.array(data_test.tolist())
+        return data_train, data_test
+    
+    if option == "a":
+        data_train = df_test['past_block_addr'].values
+        data_train = np.array(data_train.tolist())
+        
+        data_test = df_test['past_block_addr'].values
+        data_test = np.array(data_test.tolist())
+        return data_train, data_test
+

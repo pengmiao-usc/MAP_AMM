@@ -126,7 +126,7 @@ def evaluate(y_test,y_pred_bin):
     print("p,r,f1:",precision_score_res,recall_score_res,f1_score_res)
     return precision_score_res,recall_score_res,f1_score_res
 
-def run_val(test_loader, train_loader, df_test, app_name, model_save_path, res_path, option, gpu_id):
+def run_val(test_loader, df_test, app_name, model_save_path, res_path, option, gpu_id):
     global model
     global device
     
